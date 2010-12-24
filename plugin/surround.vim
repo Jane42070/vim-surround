@@ -569,9 +569,16 @@ function! s:opfunc(type,...) " {{{1
   if type ==# "v" && a:type !=# "v"
     call setreg(reg,before.getreg(reg).after,"v")
   endif
-  silent exe 'norm! gv'.(reg == '"' ? '' : '"' . reg).'p`['
+  silent exe 'norm! gv"_d'
+  let pcmd = (col("']") == col("$") && col('.') + 1 == col('$')) ? 'p' : 'P'
+  exe 'norm! '(reg == '"' ? '' : '"' . reg).pcmd.'`['
   if type ==# 'V' || (getreg(reg) =~ '\n' && type ==# 'v')
     call s:reindent()
+  endif
+  if a:0 && a:1 && char =~ '^ '
+    exe 'norm! `]J'
+    call setline('.', substitute(getline('.'), '^\(\s*\S\)\s*$', '\1', ''))
+    exe 'norm! `[kJ'
   endif
   call setreg(reg,reg_save,reg_type)
   let &selection = sel_save
