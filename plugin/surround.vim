@@ -401,72 +401,98 @@ function! s:dosurround(...) " {{{1
   endif
   let cb_save = &clipboard
   set clipboard-=unnamed
-  let append = ""
   let original = getreg('"')
   let otype = getregtype('"')
   call setreg('"',"")
   let strcount = (scount == 1 ? "" : scount)
+  let pos = getpos('.')
   if char == '/'
-    exe 'norm! '.strcount.'[/d'.strcount.']/'
+    exe 'norm! '.strcount.'[/y'.strcount.']/'
   else
-    exe 'norm! d'.strcount.'i'.char
+    exe 'norm! y'.strcount.'i'.char
   endif
+  call setpos('.', pos)
   let keeper = getreg('"')
-  let okeeper = keeper " for reindent below
   if keeper == ""
     call setreg('"',original,otype)
     let &clipboard = cb_save
     return ""
   endif
-  let oldline = getline('.')
-  let oldlnum = line('.')
-  if char ==# "p"
-    call setreg('"','','V')
-  elseif char ==# "s" || char ==# "w" || char ==# "W"
-    " Do nothing
-    call setreg('"','')
+  let white_after = ''
+  let white_before = ''
+  if char =~# '[Wpsw]'
+    exe 'norm! '.strcount.'da'.char
+    let mlist = matchlist(getreg('"'), '^\(\s*\)\(.\{-\}\)\(\n*\s*\)$')
+    let keeper = mlist[2]
+    let white_before = mlist[1]
+    let white_after = mlist[3]
+    let ma = ''
+    let mb = ''
   elseif char =~ "[\"'`]"
     exe "norm! i \<Esc>d2i".char
-    call setreg('"',substitute(getreg('"'),' ','',''))
+    let keeper = substitute(getreg('"'), ' ', '', '')
+    let ma = char
+    let mb = char
   elseif char == '/'
+    exe 'norm! '.strcount.'[/d'.strcount.']/'
+    let keeper = getreg('"') . '/'
     norm! "_x
-    call setreg('"','/**/',"c")
-    let keeper = substitute(substitute(keeper,'^/\*\s\=','',''),'\s\=\*$','','')
+    let ma = '/\*'
+    let mb = '\*/'
   else
-    " One character backwards
-    call search('.','bW')
-    exe "norm! da".char
-  endif
-  let removed = getreg('"')
-  let rem2 = substitute(removed,'\n.*','','')
-  let oldhead = strpart(oldline,0,strlen(oldline)-strlen(rem2))
-  let oldtail = strpart(oldline,  strlen(oldline)-strlen(rem2))
-  let regtype = getregtype('"')
-  if char =~# '[\[({<T]' || spc
-    let keeper = substitute(keeper,'^\s\+','','')
-    let keeper = substitute(keeper,'\s\+$','','')
-  endif
-  if col("']") == col("$") && col('.') + 1 == col('$')
-    if oldhead =~# '^\s*$' && a:0 < 2
-      let keeper = substitute(keeper,'\%^\n'.oldhead.'\(\s*.\{-\}\)\n\s*\%$','\1','')
+    if spc
+      exe "norm! ".strcount."ya".char
+      exe "norm! `["
+      call search('\S', 'b', line('.'))
+      if col('.') != col("'[")
+        exe "norm! lm["
+      endif
+      exe "norm! `]"
+      call search('\S', '', line('.'))
+      if col('.') != col("']")
+        exe "norm! hm]"
+      endif
+      exe "norm! `[v`]d"
+    else
+      exe "norm! ".strcount."da".char
     endif
+    let keeper = getreg('"')
+    let ma = char ==# 't' ? '<[^>]\+>' : '.'
+    let mb = ma
+  endif
+
+  let mlist = matchlist(keeper,
+        \'^\(\s*\)\('.ma.'\)\(\s*\)\(.\{-\}\)\(\s*\)\('.mb.'\)\(\n\?\)\(\s*\)$')
+  let newline = newchar == '' ? mlist[7] : ''
+  if spc
+    let keeper = mlist[4] . newline
+    call setreg('"', mlist[1].mlist[2].mlist[3].mlist[5].mlist[6].mlist[8])
+  else
+    let keeper = mlist[1] . mlist[3] . mlist[4] . mlist[5] . newline . mlist[8]
+    call setreg('"', mlist[2] . mlist[6])
+  end
+  let newline = newchar != '' ? mlist[7] : ''
+
+  let removed = getreg('"')
+  let regtype = getregtype('"')
+  if col("']") == col("$") && col('.') + 1 == col('$')
     let pcmd = "p"
   else
     let pcmd = "P"
-  endif
-  if line('.') < oldlnum && regtype ==# "V"
-    let pcmd = "p"
   endif
   call setreg('"',keeper,regtype)
   if newchar != ""
     call s:wrapreg('"',newchar)
   endif
+  call setreg('"', white_before . getreg('"') . newline . white_after, regtype)
   silent exe 'norm! ""'.pcmd.'`['
-  if removed =~ '\n' || okeeper =~ '\n' || getreg('"') =~ '\n'
-    call s:reindent()
+  if white_before != ''
+    let scount = strlen(white_before)
+    let strcount = scount == 1 ? '' : scount
+    silent exe 'norm! '.strcount.'l'
   endif
-  if getline('.') =~ '^\s\+$' && keeper =~ '^\s*\n'
-    silent norm! cc
+  if removed =~ '\n' || getreg('"') =~ '\n'
+    call s:reindent()
   endif
   call setreg('"',removed,regtype)
   let s:lastdel = removed
