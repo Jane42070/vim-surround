@@ -281,7 +281,7 @@ function! s:wrap(string,char,type,...)
     if before !~ '\n\s*$'
       let before = before . "\n"
       if special
-        let before = before . "\t"
+        let before = before . initspaces
       endif
     endif
   endif
