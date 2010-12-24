@@ -603,47 +603,88 @@ nnoremap <silent> <Plug>Yssurround :<C-U>call <SID>opfunc(v:count1)<CR>
 nnoremap <silent> <Plug>YSsurround :<C-U>call <SID>opfunc2(v:count1)<CR>
 " <C-U> discards the numerical argument but there's not much we can do with it
 nnoremap <silent> <Plug>Ysurround  :<C-U>set opfunc=<SID>opfunc<CR>g@
-nnoremap <silent> <Plug>YSurround  :<C-U>set opfunc=<SID>opfunc2<CR>g@
+nnoremap <silent> <Plug>Ygsurround :<C-U>set opfunc=<SID>opfunc2<CR>g@
 vnoremap <silent> <Plug>Vsurround  :<C-U>call <SID>opfunc(visualmode())<CR>
-vnoremap <silent> <Plug>VSurround  :<C-U>call <SID>opfunc(visualmode(),visualmode() ==# 'V' ? 1 : 0)<CR>
-vnoremap <silent> <Plug>VgSurround :<C-U>call <SID>opfunc(visualmode(),visualmode() ==# 'V' ? 0 : 1)<CR>
+vnoremap <silent> <Plug>VSurround  :<C-U>call <SID>opfunc('V')<CR>
+vnoremap <silent> <Plug>Vgsurround :<C-U>call <SID>opfunc2(visualmode())<CR>
+vnoremap <silent> <Plug>VgSurround :<C-U>call <SID>opfunc2('V')<CR>
+vnoremap <silent> <Plug>oVSurround  :<C-U>call <SID>opfunc(visualmode(),visualmode() ==# 'V' ? 1 : 0)<CR>
+vnoremap <silent> <Plug>oVgSurround :<C-U>call <SID>opfunc(visualmode(),visualmode() ==# 'V' ? 0 : 1)<CR>
 inoremap <silent> <Plug>Isurround  <C-R>=<SID>insert()<CR>
 inoremap <silent> <Plug>ISurround  <C-R>=<SID>insert(1)<CR>
 
 if !exists("g:surround_no_mappings") || ! g:surround_no_mappings
-  nmap      ds   <Plug>Dsurround
-  nmap      cs   <Plug>Csurround
-  nmap      ys   <Plug>Ysurround
-  nmap      yS   <Plug>YSurround
-  nmap      yss  <Plug>Yssurround
-  nmap      ySs  <Plug>YSsurround
-  nmap      ySS  <Plug>YSsurround
-  if !hasmapto("<Plug>Vsurround","v") && !hasmapto("<Plug>VSurround","v")
-    if exists(":xmap")
-      xmap  s    <Plug>Vsurround
-    else
-      vmap  s    <Plug>Vsurround
+  if exists("g:surround_old_mappings") && g:surround_old_mappings
+    nmap      ds   <Plug>Dsurround
+    nmap      cs   <Plug>Csurround
+    nmap      ys   <Plug>Ysurround
+    nmap      yS   <Plug>Ygsurround
+    nmap      yss  <Plug>Yssurround
+    nmap      ySs  <Plug>YSsurround
+    nmap      ySS  <Plug>YSsurround
+    if !hasmapto("<Plug>Vsurround","v") && !hasmapto("<Plug>oVSurround","v")
+      if exists(":xmap")
+        xmap  s    <Plug>Vsurround
+      else
+        vmap  s    <Plug>Vsurround
+      endif
     endif
-  endif
-  if !hasmapto("<Plug>VSurround","v")
-    if exists(":xmap")
-      xmap  S    <Plug>VSurround
-    else
-      vmap  S    <Plug>VSurround
+    if !hasmapto("<Plug>oVSurround","v")
+      if exists(":xmap")
+        xmap  S    <Plug>oVSurround
+      else
+        vmap  S    <Plug>oVSurround
+      endif
     endif
-  endif
-  if exists(":xmap")
-    xmap    gS   <Plug>VgSurround
+    if exists(":xmap")
+      xmap    gS   <Plug>oVgSurround
+    else
+      vmap    gS   <Plug>oVgSurround
+    endif
+    if !hasmapto("<Plug>Isurround","i") && "" == mapcheck("<C-S>","i")
+      imap    <C-S> <Plug>Isurround
+    endif
+    imap      <C-G>s <Plug>Isurround
+    imap      <C-G>S <Plug>ISurround
+    "Implemented internally instead
+    "imap      <C-S><C-S> <Plug>ISurround
   else
-    vmap    gS   <Plug>VgSurround
+    nmap      ds   <Plug>Dsurround
+    nmap      cs   <Plug>Csurround
+    nmap      ys   <Plug>Ysurround
+    nmap      yS   <Plug>Ysurround$
+    nmap      yss  <Plug>Yssurround
+    nmap      ygs  <Plug>Ygsurround
+    nmap      ygS  <Plug>Ygsurround$
+    nmap      ygss <Plug>YSsurround
+    nmap      ygsgs <Plug>YSsurround
+    if !hasmapto("<Plug>Vsurround","v") && !hasmapto("<Plug>VSurround","v")
+      if exists(":xmap")
+        xmap  s    <Plug>Vsurround
+      else
+        vmap  s    <Plug>Vsurround
+      endif
+    endif
+    if !hasmapto("<Plug>VSurround","v")
+      if exists(":xmap")
+        xmap  S    <Plug>VSurround
+      else
+        vmap  S    <Plug>VSurround
+      endif
+    endif
+    if exists(":xmap")
+      xmap    gS   <Plug>VgSurround
+    else
+      vmap    gS   <Plug>VgSurround
+    endif
+    if !hasmapto("<Plug>Isurround","i") && "" == mapcheck("<C-S>","i")
+      imap    <C-S> <Plug>Isurround
+    endif
+    imap      <C-G>s <Plug>Isurround
+    imap      <C-G>S <Plug>ISurround
+    "Implemented internally instead
+    "imap      <C-S><C-S> <Plug>ISurround
   endif
-  if !hasmapto("<Plug>Isurround","i") && "" == mapcheck("<C-S>","i")
-    imap    <C-S> <Plug>Isurround
-  endif
-  imap      <C-G>s <Plug>Isurround
-  imap      <C-G>S <Plug>ISurround
-  "Implemented internally instead
-  "imap      <C-S><C-S> <Plug>ISurround
 endif
 
 let &cpo = s:cpo_save
