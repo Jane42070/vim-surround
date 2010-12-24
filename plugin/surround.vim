@@ -556,14 +556,18 @@ function! s:opfunc(type,...) " {{{1
     return s:beep()
   endif
   let keeper = getreg(reg)
+  let before = ''
+  let after = ''
   if type ==# "v" && a:type !=# "v"
-    let append = matchstr(keeper,'\_s\@<!\s*$')
-    let keeper = substitute(keeper,'\_s\@<!\s*$','','')
+    let mlist = matchlist(keeper, '^\(\s*\)\(.\{-\}\)\(\s*\)$')
+    let keeper = mlist[2]
+    let before = mlist[1]
+    let after = mlist[3]
   endif
   call setreg(reg,keeper,type)
   call s:wrapreg(reg,char,a:0 && a:1)
-  if type ==# "v" && a:type !=# "v" && append != ""
-    call setreg(reg,append,"ac")
+  if type ==# "v" && a:type !=# "v"
+    call setreg(reg,before.getreg(reg).after,"v")
   endif
   silent exe 'norm! gv'.(reg == '"' ? '' : '"' . reg).'p`['
   if type ==# 'V' || (getreg(reg) =~ '\n' && type ==# 'v')
