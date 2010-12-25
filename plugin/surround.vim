@@ -518,7 +518,7 @@ function! s:opfunc(type,...) " {{{1
   if char == ""
     return s:beep()
   endif
-  let reg = '"'
+  let reg = 'a'
   let sel_save = &selection
   let &selection = "inclusive"
   let cb_save  = &clipboard
@@ -527,17 +527,17 @@ function! s:opfunc(type,...) " {{{1
   let reg_type = getregtype(reg)
   let blockmode = a:0 && a:1
   if a:type == "char"
-    silent norm! `[v`]d
+    silent exe 'norm! `[v`]"'.reg.'d'
   elseif a:type == "line"
-    silent norm! `[V`]d
+    silent exe 'norm! `[V`]"'.reg.'d'
   elseif a:type =~ '^\d\+$'
-    silent exe 'norm! '.a:type.'dd'
+    silent exe 'norm! "'.reg.a:type.'dd'
   elseif a:type ==# "v" || a:type ==# "V" || a:type ==# "\<C-V>"
     let ve = &virtualedit
     if !(a:0 && a:1)
       set virtualedit=
     endif
-    silent exe 'norm! `<'.a:type.'`>d'
+    silent exe 'norm! `<'.a:type.'`>"'.reg.'d'
     let &virtualedit = ve
   else
     let &selection = sel_save
@@ -560,7 +560,7 @@ function! s:opfunc(type,...) " {{{1
   call s:wrapreg(reg,char,blockmode)
   call setreg(reg,before.getreg(reg).after,otype)
   let pcmd = (col("']") == col("$") && col('.') + 1 == col('$')) ? 'p' : 'P'
-  exe 'norm! '(reg == '"' ? '' : '"' . reg).pcmd.'`['
+  exe 'norm! "'.reg.pcmd.'`['
   if type ==# 'V' || (getreg(reg) =~ '\n' && type ==# 'v')
     call s:reindent()
   endif
