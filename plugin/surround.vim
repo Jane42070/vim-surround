@@ -279,10 +279,7 @@ function! s:wrap(string,char,type,...)
       let after = strpart(after,1)
     endif
     if before !~ '\n\s*$'
-      let before = before . "\n"
-      if special
-        let before = before . initspaces
-      endif
+      let before = before . "\n" . initspaces
     endif
   endif
   if type ==# 'V'
@@ -541,7 +538,7 @@ function! s:opfunc(type,...) " {{{1
     if !(a:0 && a:1)
       set virtualedit=
     endif
-    silent exe 'norm! gv"'.reg.'y'
+    silent exe 'norm! `<'.a:type.'`>"'.reg.'y'
     let &virtualedit = ve
   elseif a:type =~ '^\d\+$'
     let type = 'v'
@@ -682,6 +679,11 @@ if !exists("g:surround_no_mappings") || ! g:surround_no_mappings
       else
         vmap  S    <Plug>VSurround
       endif
+    endif
+    if exists(":xmap")
+      xmap    gs   <Plug>Vgsurround
+    else
+      vmap    gs   <Plug>Vgsurround
     endif
     if exists(":xmap")
       xmap    gS   <Plug>VgSurround
