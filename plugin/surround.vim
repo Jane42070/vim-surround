@@ -586,7 +586,7 @@ function! s:opfunc(type,...) " {{{1
   let &selection = sel_save
   let &clipboard = cb_save
   if a:type =~ '^\d\+$'
-    silent! call repeat#set("\<Plug>Y".(a:0 && a:1 ? "S" : "s")."surround".char,a:type)
+    silent! call repeat#set("\<Plug>Y".(a:0 && a:1 ? "gs" : "s")."surround".char,a:type)
   endif
 endfunction
 
@@ -613,7 +613,7 @@ endfunction " }}}1
 nnoremap <silent> <Plug>Dsurround  :<C-U>call <SID>dosurround(<SID>inputtarget())<CR>
 nnoremap <silent> <Plug>Csurround  :<C-U>call <SID>changesurround()<CR>
 nnoremap <silent> <Plug>Yssurround :<C-U>call <SID>opfunc(v:count1)<CR>
-nnoremap <silent> <Plug>YSsurround :<C-U>call <SID>opfunc2(v:count1)<CR>
+nnoremap <silent> <Plug>Ygssurround :<C-U>call <SID>opfunc2(v:count1)<CR>
 " <C-U> discards the numerical argument but there's not much we can do with it
 nnoremap <silent> <Plug>Ysurround  :<C-U>set opfunc=<SID>opfunc<CR>g@
 nnoremap <silent> <Plug>Ygsurround :<C-U>set opfunc=<SID>opfunc2<CR>g@
@@ -633,8 +633,8 @@ if !exists("g:surround_no_mappings") || ! g:surround_no_mappings
     nmap      ys   <Plug>Ysurround
     nmap      yS   <Plug>Ygsurround
     nmap      yss  <Plug>Yssurround
-    nmap      ySs  <Plug>YSsurround
-    nmap      ySS  <Plug>YSsurround
+    nmap      ySs  <Plug>Ygssurround
+    nmap      ySS  <Plug>Ygssurround
     if !hasmapto("<Plug>Vsurround","v") && !hasmapto("<Plug>oVSurround","v")
       if exists(":xmap")
         xmap  s    <Plug>Vsurround
@@ -669,8 +669,8 @@ if !exists("g:surround_no_mappings") || ! g:surround_no_mappings
     nmap      yss  <Plug>Yssurround
     nmap      ygs  <Plug>Ygsurround
     nmap      ygS  <Plug>Ygsurround$
-    nmap      ygss <Plug>YSsurround
-    nmap      ygsgs <Plug>YSsurround
+    nmap      ygss <Plug>Ygssurround
+    nmap      ygsgs <Plug>Ygssurround
     if !hasmapto("<Plug>Vsurround","v") && !hasmapto("<Plug>VSurround","v")
       if exists(":xmap")
         xmap  s    <Plug>Vsurround
