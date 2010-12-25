@@ -525,57 +525,62 @@ function! s:opfunc(type,...) " {{{1
   set clipboard-=unnamed
   let reg_save = getreg(reg)
   let reg_type = getregtype(reg)
-  "call setreg(reg,"\n","c")
-  let type = a:type
+  let blockmode = a:0 && a:1
   if a:type == "char"
-    silent exe 'norm! v`[o`]"'.reg.'y'
-    let type = 'v'
+    silent norm! `[v`]d
   elseif a:type == "line"
-    silent exe 'norm! `[V`]"'.reg.'y'
-    let type = 'V'
+    silent norm! `[V`]d
+  elseif a:type =~ '^\d\+$'
+    silent exe 'norm! '.a:type.'dd'
   elseif a:type ==# "v" || a:type ==# "V" || a:type ==# "\<C-V>"
     let ve = &virtualedit
     if !(a:0 && a:1)
       set virtualedit=
     endif
-    silent exe 'norm! `<'.a:type.'`>"'.reg.'y'
+    silent exe 'norm! `<'.a:type.'`>d'
     let &virtualedit = ve
-  elseif a:type =~ '^\d\+$'
-    let type = 'v'
-    silent exe 'norm! ^v'.a:type.'$h"'.reg.'y'
-    if mode() ==# 'v'
-      norm! v
-      return s:beep()
-    endif
   else
     let &selection = sel_save
     let &clipboard = cb_save
     return s:beep()
   endif
+  let type = getregtype(reg)
+  let otype = type
   let keeper = getreg(reg)
   let before = ''
   let after = ''
-  if type ==# "v" && a:type !=# "v"
-    let mlist = matchlist(keeper, '^\(\s*\)\(.\{-\}\)\(\s*\)$')
+  if type ==# 'v' || (type ==# 'V' && !blockmode)
+    let type = 'v'
+    let mlist = matchlist(keeper, '^\(\s*\)\(.\{-\}\)\(\n\?\s*\)$')
     let keeper = mlist[2]
     let before = mlist[1]
     let after = mlist[3]
   endif
   call setreg(reg,keeper,type)
-  call s:wrapreg(reg,char,a:0 && a:1)
-  if type ==# "v" && a:type !=# "v"
-    call setreg(reg,before.getreg(reg).after,"v")
-  endif
-  silent exe 'norm! gv"_d'
+  call s:wrapreg(reg,char,blockmode)
+  call setreg(reg,before.getreg(reg).after,otype)
   let pcmd = (col("']") == col("$") && col('.') + 1 == col('$')) ? 'p' : 'P'
   exe 'norm! '(reg == '"' ? '' : '"' . reg).pcmd.'`['
   if type ==# 'V' || (getreg(reg) =~ '\n' && type ==# 'v')
     call s:reindent()
   endif
   if a:0 && a:1 && char =~ '^ '
-    exe 'norm! `]J'
-    call setline('.', substitute(getline('.'), '^\(\s*\S\)\s*$', '\1', ''))
-    exe 'norm! `[kJ'
+    let spos = getpos("'[")
+    let epos = getpos("']")
+
+    call setpos('.', epos)
+    let trim = (match(getline(line('.') + 1), '^\s*$') != -1)
+    norm! J
+    if trim && getline('.')[col('.')-1] =~ '\s'
+      norm! x
+    endif
+    let epos = getpos(".")
+
+    call setpos('.', spos)
+    norm! kJm[
+
+    let epos[1] -= 1
+    call setpos("']", epos)
   endif
   call setreg(reg,reg_save,reg_type)
   let &selection = sel_save
