@@ -47,10 +47,11 @@ function! s:inputtarget()
   endif
   let t = substitute(c, '^\d* \?', '', '')
   if strlen(t) == 1 && stridx(builtins, t) != -1 &&
-    \mapcheck('a' . t, 'o') == '' && mapcheck('i' . t, 'o') == ''
+  \  mapcheck('a' . t, 'o') == '' && mapcheck('i' . t, 'o') == ''
     return c
   endif
-  while maparg('a' . t, 'o') == '' && maparg('i' . t, 'o') == ''
+  while maparg('a' . t, 'o') == '' && maparg('i' . t, 'o') == '' &&
+  \     strlen(t) <= g:surround_to_stroke_limit
     let char = s:getchar()
     if char =~ "\<Esc>\|\<C-C>\|\0"
       return ""
@@ -596,6 +597,10 @@ elseif !exists("g:surround_no_default_objects") ||
       g:surround_objects[key] = val
     endif
   endfor
+endif
+
+if !exists("g:surround_to_stroke_limit")
+  let g:surround_to_stroke_limit = 2
 endif
 
 nnoremap <silent> <Plug>Dsurround  :<C-U>call <SID>dosurround(<SID>inputtarget())<CR>
