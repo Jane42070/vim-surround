@@ -72,9 +72,10 @@ function! s:inputreplacement()
     return ""
   endif
   let r = substitute(c, '^ \?', '', '')
+  let list = keys(g:surround_objects)
   while 1
-    let l = filter(keys(g:surround_objects), "v:val =~# '^\\V' . r")
-    if len(l) <= 1
+    let list = filter(list, "v:val =~# '^\\V' . r")
+    if len(list) <= 1
       break
     endif
     let char = s:getchar()
