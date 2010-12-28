@@ -70,9 +70,22 @@ function! s:inputreplacement()
   endif
   if c =~ "\<Esc>" || c =~ "\<C-C>"
     return ""
-  else
-    return c
   endif
+  let r = substitute(c, '^ \?', '', '')
+  while 1
+    let l = map(keys(g:surround_objects), "match(v:val, '^\\V' . r) != -1")
+    let l = filter(l, 'v:val')
+    if len(l) <= 1
+      break
+    endif
+    let char = s:getchar()
+    if char =~ "\<Esc>\|\<C-C>"
+      return ""
+    endif
+    let r .= char
+    let c .= char
+  endwhile
+  return c
 endfunction
 
 function! s:beep()
@@ -594,7 +607,7 @@ elseif !exists("g:surround_no_default_objects") ||
       \!g:surround_no_default_objects
   for [key, val] in items(s:surround_default_objects)
     if !has_key(g:surround_objects, key)
-      g:surround_objects[key] = val
+      let g:surround_objects[key] = val
     endif
   endfor
 endif
