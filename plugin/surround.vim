@@ -379,15 +379,10 @@ function! s:dosurround(...) " {{{1
     let scount = scount * matchstr(char,'^\d\+')
     let char = substitute(char,'^\d\+','','')
   endif
+  let strcount = (scount == 1 ? "" : scount)
   if char =~ '^ '
     let char = strpart(char,1)
     let spc = 1
-  endif
-  if char == 'a'
-    let char = '>'
-  endif
-  if char == 'r'
-    let char = ']'
   endif
   let newchar = ""
   if a:0 > 1
@@ -396,28 +391,33 @@ function! s:dosurround(...) " {{{1
       return s:beep()
     endif
   endif
+
   let cb_save = &clipboard
   set clipboard-=unnamed
   let original = getreg('"')
   let otype = getregtype('"')
   call setreg('"',"")
-  let strcount = (scount == 1 ? "" : scount)
+
   let pos = getpos('.')
-  if char == '/'
-    exe 'norm! '.strcount.'[/y'.strcount.']/'
-  else
-    exe 'norm! y'.strcount.'i'.char
-  endif
+  " Don't use normal! for user-defined objects
+  exe 'norm y'.strcount.'i'.char
   call setpos('.', pos)
-  let keeper = getreg('"')
-  if keeper == ""
+  let inner = getreg('"')
+  if inner == ""
     call setreg('"',original,otype)
     let &clipboard = cb_save
     return ""
   endif
+
   let white_after = ''
   let white_before = ''
+
   if char =~# '[Wpsw]'
+    " Non-block objects have strange behavior for counting.
+    " thi*s is example  ; * is cursor, here
+    "   2daw -> example (deleted "this is ")
+    "   2diw -> is example (deleted "this ")
+    " We prefer to wrap 2 words with 2csw command.
     exe 'norm! '.strcount.'da'.char
     let mlist = matchlist(getreg('"'), '^\(\s*\)\(.\{-\}\)\(\n*\s*\)$')
     let keeper = mlist[2]
@@ -425,50 +425,46 @@ function! s:dosurround(...) " {{{1
     let white_after = mlist[3]
     let ma = ''
     let mb = ''
-  elseif char =~ "[\"'`]"
-    exe "norm! i \<Esc>d2i".char
-    let keeper = substitute(getreg('"'), ' ', '', '')
-    let ma = char
-    let mb = char
-  elseif char == '/'
-    exe 'norm! '.strcount.'[/d'.strcount.']/'
-    let keeper = getreg('"') . '/'
-    norm! "_x
-    let ma = '/\*'
-    let mb = '\*/'
   else
+    " For block objects, we assume that difference in 'inner' and 'outer'
+    " objects is surrounding symbol.
     if spc
-      exe "norm! ".strcount."ya".char
-      exe "norm! `["
+      " Don't use normal! for user-defined objects
+      exe "norm ".strcount."ya".char
+      norm! `[
       call search('\S', 'b', line('.'))
       if col('.') != col("'[")
         exe "norm! lm["
       endif
-      exe "norm! `]"
+      norm! `]
       call search('\S', '', line('.'))
       if col('.') != col("']")
         exe "norm! hm]"
       endif
       exe "norm! `[v`]d"
     else
-      exe "norm! ".strcount."da".char
+      " Don't use normal! for user-defined objects
+      exe "norm ".strcount."da".char
     endif
     let keeper = getreg('"')
-    let ma = char ==# 't' ? '<[^>]\+>' : '.'
-    let mb = ma
+    let ma = keeper[:(stridx(keeper, inner) - 1)]
+    let mb = keeper[(strlen(ma) + strlen(inner)):]
+    let ma = substitute(ma, '^\v\_s*(.{-})\_s*$', '\1', '')
+    let mb = substitute(mb, '^\v\_s*(.{-})\_s*$', '\1', '')
   endif
 
   let mlist = matchlist(keeper,
-        \'^\(\s*\)\('.ma.'\)\(\s*\)\(.\{-\}\)\(\s*\)\('.mb.'\)\(\n\?\)\(\s*\)$')
-  let newline = newchar == '' ? mlist[7] : ''
+        \'^\v(\s*)(\V'.ma.'\v)(\s*)(.{-})(\s*)(\V'.mb.'\v)(\n?)(\s*)$')
   if spc
-    let keeper = mlist[4] . newline
+    let white_after = mlist[7] . white_after
+    let keeper = mlist[4]
     call setreg('"', mlist[1].mlist[2].mlist[3].mlist[5].mlist[6].mlist[8])
   else
-    let keeper = mlist[1] . mlist[3] . mlist[4] . mlist[5] . newline . mlist[8]
+    let white_before = white_before . mlist[1]
+    let white_after = mlist[7] . mlist[8] . white_after
+    let keeper = mlist[3] . mlist[4] . mlist[5]
     call setreg('"', mlist[2] . mlist[6])
   end
-  let newline = newchar != '' ? mlist[7] : ''
 
   let removed = getreg('"')
   let regtype = getregtype('"')
@@ -477,12 +473,14 @@ function! s:dosurround(...) " {{{1
   else
     let pcmd = "P"
   endif
+
   call setreg('"',keeper,regtype)
   if newchar != ""
     call s:wrapreg('"',newchar)
   endif
-  call setreg('"', white_before . getreg('"') . newline . white_after, regtype)
-  silent exe 'norm! ""'.pcmd.'`['
+  call setreg('"', white_before . getreg('"') . white_after, regtype)
+
+  silent exe 'norm! '.pcmd.'`['
   if white_before != ''
     let scount = strlen(white_before)
     let strcount = scount == 1 ? '' : scount
@@ -491,9 +489,11 @@ function! s:dosurround(...) " {{{1
   if removed =~ '\n' || getreg('"') =~ '\n'
     call s:reindent()
   endif
+
   call setreg('"',removed,regtype)
   let s:lastdel = removed
   let &clipboard = cb_save
+
   if newchar == ""
     silent! call repeat#set("\<Plug>Dsurround".char,scount)
   else
