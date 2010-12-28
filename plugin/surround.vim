@@ -578,17 +578,17 @@ function! s:closematch(str) " {{{1
 endfunction " }}}1
 
 let s:surround_default_objects = {
-\  "(":      "( \r )",
-\  ")":      "(\r)",
+\  "(":      "(\r)",
+\  ")":      "( \r )",
 \  "b":      "(\r)",
-\  "{":      "{ \r }",
-\  "}":      "{\r}",
+\  "{":      "{\r}",
+\  "}":      "{ \r }",
 \  "B":      "{\r}",
-\  "[":      "[ \r ]",
-\  "]":      "[\r]",
+\  "[":      "[\r]",
+\  "]":      "[ \r ]",
 \  "r":      "[\r]",
-\  "<":      "< \r >",
-\  ">":      "<\r>",
+\  "<":      "<\r>",
+\  ">":      "< \r >",
 \  "a":      "<\r>",
 \  "p":      "\n\r\n\n",
 \  "t":      "<\1tag: \1>\r</\1\r\\s.*$\r\1>",
@@ -604,7 +604,7 @@ let s:surround_default_objects = {
 if !exists("g:surround_objects")
   let g:surround_objects = s:surround_default_objects
 elseif !exists("g:surround_no_default_objects") ||
-      \!g:surround_no_default_objects
+\      !g:surround_no_default_objects
   for [key, val] in items(s:surround_default_objects)
     if !has_key(g:surround_objects, key)
       let g:surround_objects[key] = val
