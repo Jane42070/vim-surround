@@ -34,6 +34,7 @@ function! s:getchar()
 endfunction
 
 function! s:inputtarget()
+  let builtins = "wWsp[]()b<>t{}B\"'`"
   let c = s:getchar()
   while c =~ '^\d\+$'
     let c = c . s:getchar()
@@ -43,9 +44,21 @@ function! s:inputtarget()
   endif
   if c =~ "\<Esc>\|\<C-C>\|\0"
     return ""
-  else
+  endif
+  let t = substitute(c, '^\d* \?', '', '')
+  if strlen(t) == 1 && stridx(builtins, t) != -1 &&
+    \mapcheck('a' . t, 'o') == '' && mapcheck('i' . t, 'o') == ''
     return c
   endif
+  while maparg('a' . t, 'o') == '' && maparg('i' . t, 'o') == ''
+    let char = s:getchar()
+    if char =~ "\<Esc>\|\<C-C>\|\0"
+      return ""
+    endif
+    let t .= char
+    let c .= char
+  endwhile
+  return c
 endfunction
 
 function! s:inputreplacement()
