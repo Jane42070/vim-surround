@@ -178,64 +178,22 @@ function! s:wrap(string,char,type,...)
     let initspaces = matchstr(getline('.'),'\%^\s*')
   endif
   " Duplicate b's are just placeholders (removed)
-  let pairs = "b()B{}r[]a<>"
   let extraspace = ""
   if newchar =~ '^ '
     let newchar = strpart(newchar,1)
     let extraspace = ' '
   endif
-  let idx = stridx(pairs,newchar)
   if newchar == ' '
     let before = ''
     let after  = ''
-  elseif exists("b:surround_".char2nr(newchar))
-    let all    = s:process(b:surround_{char2nr(newchar)})
+  elseif exists("b:surround_objects") && has_key(b:surround_objects, newchar)
+    let all    = s:process(b:surround_objects[newchar])
     let before = s:extractbefore(all)
     let after  =  s:extractafter(all)
-  elseif exists("g:surround_".char2nr(newchar))
-    let all    = s:process(g:surround_{char2nr(newchar)})
+  elseif has_key(g:surround_objects, newchar)
+    let all    = s:process(g:surround_objects[newchar])
     let before = s:extractbefore(all)
     let after  =  s:extractafter(all)
-  elseif newchar ==# "p"
-    let before = "\n"
-    let after  = "\n\n"
-  elseif newchar =~# "[tT\<C-T><,]"
-    let dounmapp = 0
-    let dounmapb = 0
-    if !maparg(">","c")
-      let dounmapb= 1
-      " Hide from AsNeeded
-      exe "cn"."oremap > <CR>"
-    endif
-    let default = ""
-    if newchar ==# "T"
-      if !exists("s:lastdel")
-        let s:lastdel = ""
-      endif
-      let default = matchstr(s:lastdel,'<\zs.\{-\}\ze>')
-    endif
-    let tag = input("<",default)
-    echo "<".substitute(tag,'>*$','>','')
-    if dounmapb
-      silent! cunmap >
-    endif
-    if tag != ""
-      let tag = substitute(tag,'>*$','','')
-      let before = '<'.tag.'>'
-      if tag =~ '/$'
-        let after = ''
-      else
-        let after  = '</'.substitute(tag,' .*','','').'>'
-      endif
-      if newchar == "\<C-T>" || newchar == ","
-        if type ==# "v" || type ==# "V"
-          let before = before . "\n\t"
-        endif
-        if type ==# "v"
-          let after  = "\n". after
-        endif
-      endif
-    endif
   elseif newchar ==# 'l' || newchar == '\'
     " LaTeX
     let env = input('\begin{')
@@ -252,24 +210,6 @@ function! s:wrap(string,char,type,...)
     "if type ==# 'v'
     "let after  = "\n".initspaces.after
     "endif
-  elseif newchar ==# 'f' || newchar ==# 'F'
-    let fnc = input('function: ')
-    if fnc != ""
-      let before = substitute(fnc,'($','','').'('
-      let after  = ')'
-      if newchar ==# 'F'
-        let before = before . ' '
-        let after  = ' ' . after
-      endif
-    endif
-  elseif idx >= 0
-    let spc = (idx % 3) == 1 ? " " : ""
-    let idx = idx / 3 * 3
-    let before = strpart(pairs,idx+1,1) . spc
-    let after  = spc . strpart(pairs,idx+2,1)
-  elseif newchar == "\<C-[>" || newchar == "\<C-]>"
-    let before = "{\n\t"
-    let after  = "\n}"
   elseif newchar !~ '\a'
     let before = newchar
     let after  = newchar
@@ -622,6 +562,41 @@ function! s:closematch(str) " {{{1
     return ""
   endif
 endfunction " }}}1
+
+let s:surround_default_objects = {
+\  "(":      "( \r )",
+\  ")":      "(\r)",
+\  "b":      "(\r)",
+\  "{":      "{ \r }",
+\  "}":      "{\r}",
+\  "B":      "{\r}",
+\  "[":      "[ \r ]",
+\  "]":      "[\r]",
+\  "r":      "[\r]",
+\  "<":      "< \r >",
+\  ">":      "<\r>",
+\  "a":      "<\r>",
+\  "p":      "\n\r\n\n",
+\  "t":      "<\1tag: \1>\r</\1\r\\s.*$\r\1>",
+\  "T":      "<\1tag: \1> \r </\1\r\\s.*$\r\1>",
+\  "\<C-t>": "<\1tag: \1>\n\t\r\n</\1\r\\s.*$\r\1>",
+\  ",":      "<\1tag: \1>\n\t\r\n</\1\r\\s.*$\r\1>",
+\  "f":      "\1function: \1(\r)",
+\  "F":      "\1function: \1( \r )",
+\  "\<C-[>": "{\n\t\r}",
+\  "\<C-]>": "{\n\t\r}",
+\}
+
+if !exists("g:surround_objects")
+  let g:surround_objects = s:surround_default_objects
+elseif !exists("g:surround_no_default_objects") ||
+      \!g:surround_no_default_objects
+  for [key, val] in items(s:surround_default_objects)
+    if !has_key(g:surround_objects, key)
+      g:surround_objects[key] = val
+    endif
+  endfor
+endif
 
 nnoremap <silent> <Plug>Dsurround  :<C-U>call <SID>dosurround(<SID>inputtarget())<CR>
 nnoremap <silent> <Plug>Csurround  :<C-U>call <SID>changesurround()<CR>
