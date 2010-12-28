@@ -73,8 +73,7 @@ function! s:inputreplacement()
   endif
   let r = substitute(c, '^ \?', '', '')
   while 1
-    let l = map(keys(g:surround_objects), "match(v:val, '^\\V' . r) != -1")
-    let l = filter(l, 'v:val')
+    let l = filter(keys(g:surround_objects), "v:val =~# '^\\V' . r")
     if len(l) <= 1
       break
     endif
