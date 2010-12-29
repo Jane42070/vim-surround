@@ -555,6 +555,12 @@ function! s:opfunc2(arg)
   call s:opfunc(a:arg,1)
 endfunction " }}}1
 
+function! s:dotag()
+  let last = exists("s:lastdel") ? s:lastdel : ''
+  let default = matchstr(last, '<\zs.\{-\}\ze>')
+  return input('tag ', default)
+endfunction
+
 function! s:dolatex()
   let env = input('\begin{')
   let env = '{' . env
@@ -593,7 +599,7 @@ let s:surround_default_objects = {
 \  "a":      "<\r>",
 \  "p":      "\n\r\n\n",
 \  "t":      "<\1tag: \1>\r</\1\r\\s.*$\r\1>",
-\  "T":      "<\1tag: \1> \r </\1\r\\s.*$\r\1>",
+\  "T":      "<\1\es:dotag()\1>\r</\1\r\\s.*$\r\1>",
 \  "\<C-t>": "<\1tag: \1>\n\t\r\n</\1\r\\s.*$\r\1>",
 \  ",":      "<\1tag: \1>\n\t\r\n</\1\r\\s.*$\r\1>",
 \  "l":      "\\begin\1\es:dolatex()\1\r\\end\1\r[^}]*$\r\1",
