@@ -144,7 +144,12 @@ function! s:process(string)
     let i = i + 1
     let repl_{i} = ''
     let m = matchstr(a:string,nr2char(i).'.\{-\}\ze'.nr2char(i))
-    if m != ''
+    if m == ''
+      continue
+    elseif m[1] == "\e"
+      let m = substitute(strpart(m,2),'\r.*','','')
+      let repl_{i} = eval(m)
+    else
       let m = substitute(strpart(m,1),'\r.*','','')
       let repl_{i} = input(substitute(m,':\s*$','','').': ')
     endif
@@ -208,22 +213,6 @@ function! s:wrap(string,char,type,...)
     let all    = s:process(g:surround_objects[newchar])
     let before = s:extractbefore(all)
     let after  =  s:extractafter(all)
-  elseif newchar ==# 'l' || newchar == '\'
-    " LaTeX
-    let env = input('\begin{')
-    let env = '{' . env
-    let env = env . s:closematch(env)
-    echo '\begin'.env
-    if env != ""
-      let before = '\begin'.env
-      let after  = '\end'.matchstr(env,'[^}]*').'}'
-    endif
-    "if type ==# 'v' || type ==# 'V'
-    "let before = before ."\n\t"
-    "endif
-    "if type ==# 'v'
-    "let after  = "\n".initspaces.after
-    "endif
   elseif newchar !~ '\a'
     let before = newchar
     let after  = newchar
@@ -561,6 +550,13 @@ function! s:opfunc2(arg)
   call s:opfunc(a:arg,1)
 endfunction " }}}1
 
+function! s:dolatex()
+  let env = input('\begin{')
+  let env = '{' . env
+  let env = env . s:closematch(env)
+  return env
+endfunction
+
 function! s:closematch(str) " {{{1
   " Close an open (, {, [, or < on the command line.
   let tail = matchstr(a:str,'.[^\[\](){}<>]*$')
@@ -595,6 +591,8 @@ let s:surround_default_objects = {
 \  "T":      "<\1tag: \1> \r </\1\r\\s.*$\r\1>",
 \  "\<C-t>": "<\1tag: \1>\n\t\r\n</\1\r\\s.*$\r\1>",
 \  ",":      "<\1tag: \1>\n\t\r\n</\1\r\\s.*$\r\1>",
+\  "l":      "\\begin\1\es:dolatex()\1\r\\end\1\r[^}]*$\r\1",
+\  '\':      "\\begin\1\es:dolatex()\1\r\\end\1\r[^}]*$\r\1",
 \  "f":      "\1function: \1(\r)",
 \  "F":      "\1function: \1( \r )",
 \  "\<C-[>": "{\n\t\r}",
