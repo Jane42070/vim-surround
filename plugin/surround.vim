@@ -414,12 +414,19 @@ function! s:dosurround(...) " {{{1
     let mb = substitute(mb, '^\v\_s*(.{-})\_s*$', '\1', '')
   endif
 
+  let pcmd = (col("']") == col("$") && col('.') + 1 == col('$')) ? "p" : "P"
+
   let mlist = matchlist(keeper,
         \'^\v(\s*)(\V'.ma.'\v)(\s*)(.{-})(\s*)(\V'.mb.'\v)(\n?)(\s*)$')
   if spc
     let white_after = mlist[7] . white_after
-    let keeper = mlist[4]
-    call setreg('"', mlist[1].mlist[2].mlist[3].mlist[5].mlist[6].mlist[8])
+    if pcmd ==# 'p'
+      let keeper = mlist[4]
+      call setreg('"', mlist[1].mlist[2].mlist[3].mlist[5].mlist[6].mlist[8])
+    else
+      let keeper = mlist[4] . mlist[5]
+      call setreg('"', mlist[1].mlist[2].mlist[3].mlist[6].mlist[8])
+    endif
   else
     let white_before = white_before . mlist[1]
     let white_after = mlist[7] . mlist[8] . white_after
@@ -429,11 +436,6 @@ function! s:dosurround(...) " {{{1
 
   let removed = getreg('"')
   let regtype = getregtype('"')
-  if col("']") == col("$") && col('.') + 1 == col('$')
-    let pcmd = "p"
-  else
-    let pcmd = "P"
-  endif
 
   call setreg('"',keeper,regtype)
   if newchar != ""
