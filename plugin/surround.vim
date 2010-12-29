@@ -515,7 +515,12 @@ function! s:opfunc(type,...) " {{{1
   call setreg(reg,keeper,type)
   call s:wrapreg(reg,char,blockmode)
   call setreg(reg,before.getreg(reg).after,otype)
-  let pcmd = (col("']") == col("$") && col('.') + 1 == col('$')) ? 'p' : 'P'
+  if (col("']") == col("$") && col('.') + 1 == col('$')) ||
+  \  (line("']") == line('$') + 1 && line('.') == line('$'))
+    let pcmd = 'p'
+  else
+    let pcmd = 'P'
+  endif
   exe 'norm! "'.reg.pcmd.'`['
   if type ==# 'V' || (getreg(reg) =~ '\n' && type ==# 'v')
     call s:reindent()
