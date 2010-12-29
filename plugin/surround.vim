@@ -355,8 +355,10 @@ function! s:dosurround(...) " {{{1
   call setreg('"',"")
 
   let pos = getpos('.')
+  norm! v
   " Don't use normal! for user-defined objects
-  exe 'norm y'.strcount.'i'.char
+  exe 'norm ' . strcount . 'i' . char
+  norm! y
   call setpos('.', pos)
   let inner = getreg('"')
   if inner == ""
@@ -384,9 +386,11 @@ function! s:dosurround(...) " {{{1
   else
     " For block objects, we assume that difference in 'inner' and 'outer'
     " objects is surrounding symbol.
+    norm! v
     if spc
       " Don't use normal! for user-defined objects
-      exe "norm ".strcount."ya".char
+      exe "norm " . strcount . "a" . char
+      norm! y
       norm! `[
       call search('\S', 'b', line('.'))
       if col('.') != col("'[")
@@ -400,8 +404,9 @@ function! s:dosurround(...) " {{{1
       exe "norm! `[v`]d"
     else
       " Don't use normal! for user-defined objects
-      exe "norm ".strcount."da".char
+      exe "norm " . strcount . "a" . char
     endif
+    norm! d
     let keeper = getreg('"')
     let ma = keeper[:(stridx(keeper, inner) - 1)]
     let mb = keeper[(strlen(ma) + strlen(inner)):]
