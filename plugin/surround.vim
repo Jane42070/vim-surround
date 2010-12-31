@@ -35,31 +35,33 @@ endfunction
 
 function! s:inputtarget()
   let builtins = "wWsp[]()b<>t{}B\"'`"
+
+  let spc = ''
   let c = s:getchar()
-  while c =~ '^\d\+$'
-    let c = c . s:getchar()
-  endwhile
   if c == " "
-    let c = c . s:getchar()
+    let spc = ' '
+    let c = s:getchar()
   endif
+
   if c =~ "\<Esc>\|\<C-C>\|\0"
     return ""
   endif
-  let t = substitute(c, '^\d* \?', '', '')
-  if strlen(t) == 1 && stridx(builtins, t) != -1 &&
-  \  mapcheck('a' . t, 'o') == '' && mapcheck('i' . t, 'o') == ''
-    return c
+
+  if strlen(c) == 1 && stridx(builtins, c) != -1 &&
+  \  mapcheck('a' . c, 'o') == '' && mapcheck('i' . c, 'o') == ''
+    return spc . c
   endif
-  while maparg('a' . t, 'o') == '' && maparg('i' . t, 'o') == '' &&
+
+  while maparg('a' . c, 'o') == '' && maparg('i' . c, 'o') == '' &&
   \     strlen(t) <= g:surround_to_stroke_limit
     let char = s:getchar()
     if char =~ "\<Esc>\|\<C-C>\|\0"
       return ""
     endif
-    let t .= char
     let c .= char
   endwhile
-  return c
+
+  return spc . c
 endfunction
 
 function! s:inputreplacement()
@@ -331,10 +333,6 @@ function! s:dosurround(...) " {{{1
   let scount = v:count1
   let char = (a:0 ? a:1 : s:inputtarget())
   let spc = ""
-  if char =~ '^\d\+'
-    let scount = scount * matchstr(char,'^\d\+')
-    let char = substitute(char,'^\d\+','','')
-  endif
   let strcount = (scount == 1 ? "" : scount)
   if char =~ '^ '
     let char = strpart(char,1)
