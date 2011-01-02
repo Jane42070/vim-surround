@@ -52,8 +52,8 @@ function! s:inputtarget()
     return spc . c
   endif
 
-  while maparg('a' . c, 'o') == '' && maparg('i' . c, 'o') == '' &&
-  \     strlen(c) <= g:surround_to_stroke_limit
+  while mapcheck('a' . c, 'o') != '' && maparg('a' . c, 'o') == '' &&
+  \     mapcheck('a' . c, 'o') != '' && maparg('i' . c, 'o') == ''
     let char = s:getchar()
     if char =~ "\<Esc>\|\<C-C>\|\0"
       return ""
@@ -621,10 +621,6 @@ elseif !exists("g:surround_no_default_objects") ||
       let g:surround_objects[key] = val
     endif
   endfor
-endif
-
-if !exists("g:surround_to_stroke_limit")
-  let g:surround_to_stroke_limit = 2
 endif
 
 nnoremap <silent> <Plug>Dsurround  :<C-U>call <SID>dosurround(<SID>inputtarget())<CR>
