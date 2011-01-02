@@ -368,7 +368,7 @@ function! s:dosurround(...) " {{{1
   let white_after = ''
   let white_before = ''
 
-  if char =~# '[Wpsw]'
+  if char =~# '^[Wpsw]$'
     " Non-block objects have strange behavior for counting.
     " thi*s is example  ; * is cursor, here
     "   2daw -> example (deleted "this is ")
