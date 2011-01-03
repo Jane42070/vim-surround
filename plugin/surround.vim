@@ -412,7 +412,7 @@ function! s:dosurround(...) " {{{1
   \           '^\v(\s*)(\V'.ma.'\v)(\s*)(.{-})(\s*)(\V'.mb.'\v)(\n?)(\s*)$')
   if spc
     let white_after = mlist[7] . white_after
-    if pcmd ==# 'p' || mlist[4] !~ '\n$'
+    if mlist[4] =~ '\n$' && (pcmd ==# 'p' || getline('.') == '')
       let keeper = mlist[4]
       call setreg('a', mlist[1].mlist[2].mlist[3].mlist[5].mlist[6].mlist[8])
     else
