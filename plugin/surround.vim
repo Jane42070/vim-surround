@@ -330,40 +330,36 @@ function! s:reindent() " {{{1
 endfunction " }}}1
 
 function! s:dosurround(...) " {{{1
+  let char = (a:0 > 0) ? a:1 : s:inputtarget()
+  let newchar = (a:0 > 1) ? a:2 : ''
   let scount = v:count1
-  let char = (a:0 ? a:1 : s:inputtarget())
-  let spc = ""
-  let strcount = (scount == 1 ? "" : scount)
-  if char =~ '^ '
-    let char = strpart(char,1)
+
+  let spc = 0
+  if char[0] == ' '
+    let char = char[1:]
     let spc = 1
   endif
-  let newchar = ""
-  if a:0 > 1
-    let newchar = a:2
-    if newchar == "\<Esc>" || newchar == "\<C-C>" || newchar == ""
-      return s:beep()
-    endif
+
+  if char == ''
+    return
   endif
 
-  let cb_save = &clipboard
-  set clipboard-=unnamed
-  let original = getreg('a')
-  let otype = getregtype('a')
+  let reg_save = [getreg('a'), getregtype('a')]
   call setreg('a', '')
 
   " Don't use normal! for user-defined objects.
-  exe 'norm "ay' . strcount . 'a' . char
+  execute 'silent normal "ay' . scount . 'a' . char
   if getreg('a') == ''
     " No text-object found.
-    call setreg('a', original, otype)
-    let &clipboard = cb_save
-    return ""
+    call setreg('a', reg_save[0], reg_save[1])
+    return
   endif
+  let outer_pos = [getpos("'["), getpos("']")]
 
   " Don't use normal! for user-defined objects.
-  exe 'norm "ay' . strcount . 'i' . char
+  execute 'silent normal "ay' . scount . 'i' . char
   let inner = getreg('a')
+  let innertype = getregtype('a')
 
   let white_after = ''
   let white_before = ''
@@ -374,45 +370,46 @@ function! s:dosurround(...) " {{{1
     "   2daw -> example (deleted "this is ")
     "   2diw -> is example (deleted "this ")
     " We prefer to wrap 2 words with 2csw command.
-    exe 'norm! "ad' . strcount . 'a' . char
-    let mlist = matchlist(getreg('a'), '^\(\s*\)\(.\{-\}\)\(\n*\s*\)$')
-    let keeper = mlist[2]
-    let white_before = mlist[1]
-    let white_after = mlist[3]
+    call setpos('.', outer_pos[0])
+    call search('\S', 'c', line('.'))
+    normal! m[
+    call setpos('.', outer_pos[1])
+    call search('\S', 'bc', line('.'))
+    normal! v`["ad
+
+    let outer = getreg('a')
+    let outertype = getregtype('a')
+
     let ma = ''
     let mb = ''
   else
     " For block objects, we assume that difference in 'inner' and 'outer'
     " objects is surrounding symbol.
     if spc
+      call setpos('.', outer_pos[0])
+      call search('\%(^\|\S\)\zs\s*\%#')
+      normal! m[
+      call setpos('.', outer_pos[1])
+      call search('\%#.\s*\ze\%($\|\S\)', 'e')
+      normal! v`["ad
+    else  
       " Don't use normal! for user-defined objects
-      exe 'norm "ay' . strcount . 'a' . char
-      norm! `[
-      call search('\S', 'b', line('.'))
-      if col('.') != col("'[")
-        exe "norm! lm["
-      endif
-      norm! `]
-      call search('\S', '', line('.'))
-      if col('.') != col("']")
-        norm! hm]
-      endif
-      norm! `[v`]d
-    else
-      " Don't use normal! for user-defined objects
-      exe 'norm "ad' . strcount . 'a' . char
+      execute 'silent normal "ad' . scount . 'a' . char
     endif
-    let keeper = getreg('a')
-    let ma = keeper[:(stridx(keeper, inner) - 1)]
-    let mb = keeper[(strlen(ma) + strlen(inner)):]
+    let outer = getreg('a')
+    let outertype = getregtype('a')
+
+    let ma = outer[:(stridx(outer, inner) - 1)]
+    let mb = outer[(strlen(ma) + strlen(inner)):]
+
     let ma = substitute(ma, '^\v\_s*(.{-})\_s*$', '\1', '')
     let mb = substitute(mb, '^\v\_s*(.{-})\_s*$', '\1', '')
   endif
 
   let pcmd = (col("']") == col("$") && col('.') + 1 == col('$')) ? "p" : "P"
 
-  let mlist = matchlist(keeper,
-        \'^\v(\s*)(\V'.ma.'\v)(\s*)(.{-})(\s*)(\V'.mb.'\v)(\n?)(\s*)$')
+  let mlist = matchlist(outer,
+  \           '^\v(\s*)(\V'.ma.'\v)(\s*)(.{-})(\s*)(\V'.mb.'\v)(\n?)(\s*)$')
   if spc
     let white_after = mlist[7] . white_after
     if pcmd ==# 'p' || mlist[4] !~ '\n$'
@@ -438,24 +435,22 @@ function! s:dosurround(...) " {{{1
   endif
   call setreg('a', white_before . getreg('a') . white_after, regtype)
 
-  silent exe 'norm! "a' . pcmd . '`['
+  execute 'normal! "a' . pcmd . '`['
   if white_before != ''
-    let scount = strlen(white_before)
-    let strcount = scount == 1 ? '' : scount
-    silent exe 'norm! '.strcount.'l'
+    execute 'normal! ' . strlen(white_before) . 'l'
   endif
+
   if removed =~ '\n' || getreg('a') =~ '\n'
     call s:reindent()
   endif
 
   call setreg('a', removed, regtype)
   let s:lastdel = removed
-  let &clipboard = cb_save
 
   if newchar == ""
-    silent! call repeat#set("\<Plug>Dsurround".char,scount)
+    silent! call repeat#set("\<Plug>Dsurround" . char, scount)
   else
-    silent! call repeat#set("\<Plug>Csurround".char.newchar,scount)
+    silent! call repeat#set("\<Plug>Csurround" . char . newchar, scount)
   endif
 endfunction " }}}1
 
