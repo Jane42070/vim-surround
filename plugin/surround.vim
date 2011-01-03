@@ -77,7 +77,7 @@ function! s:inputreplacement()
   let list = keys(g:surround_objects)
   while 1
     let list = filter(list, "v:val =~# '^\\V' . r")
-    if len(list) <= 1
+    if len(list) == 0 || (len(list) == 1 && list[0] == r)
       break
     endif
     let char = s:getchar()
@@ -492,7 +492,7 @@ function! s:opfunc(type,...) " {{{1
     silent exe 'norm! "'.reg.a:type.'dd'
   elseif a:type ==# "v" || a:type ==# "V" || a:type ==# "\<C-V>"
     let ve = &virtualedit
-    if !(a:0 && a:1)
+    if !blockmode
       set virtualedit=
     endif
     silent exe 'norm! `<'.a:type.'`>"'.reg.'d'
@@ -527,12 +527,11 @@ function! s:opfunc(type,...) " {{{1
   if type ==# 'V' || (getreg(reg) =~ '\n' && type ==# 'v')
     call s:reindent()
   endif
-  if a:0 && a:1 && char =~ '^ '
-    let spos = getpos("'[")
-    let epos = getpos("']")
+  if blockmode && char =~ '^ '
+    let [spos, epos] = [getpos("'["), getpos("']")]
 
     call setpos('.', epos)
-    let trim = (match(getline(line('.') + 1), '^\s*$') != -1)
+    let trim = getline(line('.') + 1) =~# '^\s*$'
     norm! J
     if trim && getline('.')[col('.')-1] =~ '\s'
       norm! x
@@ -549,7 +548,7 @@ function! s:opfunc(type,...) " {{{1
   let &selection = sel_save
   let &clipboard = cb_save
   if a:type =~ '^\d\+$'
-    silent! call repeat#set("\<Plug>Y".(a:0 && a:1 ? "gs" : "s")."surround".char,a:type)
+    silent! call repeat#set("\<Plug>Y".(blockmode ? "gs" : "s")."surround".char,a:type)
   endif
 endfunction
 
