@@ -375,11 +375,12 @@ function! s:dosurround(...) " {{{1
   else
     " For block objects, we assume that difference in 'inner' and 'outer'
     " objects is surrounding object.
-    let begin = stridx(outer, inner)
-    let end = begin + strlen(inner) - 1
-    let list = [outer[:(begin - 1)], outer[(begin):(end)], outer[(end + 1):]]
-    let so = [substitute(list[0], '^\v\_s*(.{-})\_s*$', '\1', ''),
-    \         substitute(list[2], '^\v\_s*(.{-})\_s*$', '\1', '')]
+    let idx = stridx(outer, inner)
+    if idx == -1
+      let idx = 1
+    endif
+    let so = [strpart(outer, 0, idx), strpart(outer, idx + strlen(inner))]
+    let so = map(so, "substitute(v:val, '^\\v\\_s*(.{-})\\_s*$', '\\1', '')")
   endif
 
   call setpos('.', outer_pos[1])
@@ -394,27 +395,32 @@ function! s:dosurround(...) " {{{1
 
   let pcmd = (line("']") == line("$") && line('.') + 1 == line('$')) ? "p" : "P"
 
-  let llist = matchlist(left, '^\v(.{-})(\s*)(\V' . so[0] . '\v)(.{-})$')
-  let rlist = matchlist(right, '^\v(.{-})(\V' . so[1] . '\v)(\s*)(.{-})$')
+  let idx = strridx(left, so[0])
+  let llist = matchlist(strpart(left, 0, idx), '^\v(.{-})(\s*)$')
+  let llist = [llist[1], llist[2], strpart(left, idx + strlen(so[0]))]
+
+  let idx = stridx(right, so[1])
+  let rlist = matchlist(strpart(right, idx + strlen(so[1])), '^\v(\s*)(.{-})$')
+  let rlist = [strpart(right, 0, idx), rlist[1], rlist[2]]
 
   if spc
     let mlist = matchlist(inner, '^\v(\s*)(.{-})(\s*)$')
 
-    let before = llist[1]
+    let before = llist[0]
     let after = ''
     let removed = ''
     let keeper = ''
 
-    if llist[4] == "\n"
-      let removed .= llist[2]
+    if llist[2] == "\n"
+      let removed .= llist[1]
     else
-      let keeper .= llist[2]
+      let keeper .= llist[1]
     endif
 
-    let removed .= llist[3]
-    let keeper .= llist[4]
+    let removed .= so[0]
+    let keeper .= llist[2]
 
-    if llist[4] == "\n"
+    if llist[2] == "\n"
       let keeper .= mlist[1]
     else
       let removed .= mlist[1]
@@ -428,20 +434,20 @@ function! s:dosurround(...) " {{{1
       let removed .= mlist[3]
     endif
 
-    if rlist[4] == "\n"
-      let removed .= substitute(rlist[1], '\_S', '', 'g')
-      let after .= substitute(rlist[1], '\s', '', 'g')
+    if rlist[2] == "\n"
+      let removed .= substitute(rlist[0], '\_S', '', 'g')
+      let after .= substitute(rlist[0], '\s', '', 'g')
     else
-      let keeper .= rlist[1]
+      let keeper .= rlist[0]
     endif
 
-    let removed .= rlist[2] . rlist[3]
-    let after .= rlist[4]
+    let removed .= so[1] . rlist[1]
+    let after .= rlist[2]
   else
-    let before = llist[1] . llist[2]
-    let keeper = llist[4] . inner . rlist[1]
-    let after = rlist[3] . rlist[4]
-    let removed = llist[3] . rlist[2]
+    let before = llist[0] . llist[1]
+    let keeper = llist[2] . inner . rlist[0]
+    let after = rlist[1] . rlist[2]
+    let removed = so[0] . so[1]
   endif
 
   call setreg('a', keeper, 'v')
