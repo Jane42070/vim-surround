@@ -347,6 +347,7 @@ function! s:dosurround(...) " {{{1
   let sel_save = &selection
   let &selection = "inclusive"
 
+  let pos_save = getpos(".")
   let reg_save = [getreg('a'), getregtype('a')]
   call setreg('a', '')
 
@@ -357,12 +358,19 @@ function! s:dosurround(...) " {{{1
     call setreg('a', reg_save[0], reg_save[1])
     return
   endif
-  let outer = getreg('a')
   let outer_pos = [getpos("'["), getpos("']")]
+
+  call setpos(".", pos_save)
 
   " Don't use normal! for user-defined objects.
   execute 'silent normal "ay' . scount . 'i' . char
   let inner = getreg('a')
+  let innertype = getregtype('a')
+
+  call setpos(".", pos_save)
+
+  let before = ''
+  let after = ''
 
   if char =~# '^[Wpsw]$'
     " Adjust non-block objects.
@@ -370,92 +378,87 @@ function! s:dosurround(...) " {{{1
     "   2daw -> example (deleted "this is ")
     "   2diw -> is example (deleted "this ")
     " We prefer to wrap 2 words with 2csw command.
-    let inner = substitute(outer, '^\v\s*(.{-})\n*\s*$', '\1', '')
-    let so = ['', '']
+    execute 'silent normal "ad' . scount . 'a' . char
+
+    let outer = getreg('a')
+    let outertype = getregtype('a')
+
+    let mlist = matchlist(outer, '^\v(\_s*)(.{-})(\_s*)$')
+    let before = mlist[1]
+    let inner = mlist[2]
+    let after = mlist[3]
+    let surrounds = ['', '']
   else
     " For block objects, we assume that difference in 'inner' and 'outer'
     " objects is surrounding object.
-    let idx = stridx(outer, inner)
-    if idx == -1
-      let idx = 1
+    if spc && innertype ==# 'V'
+      call setpos('.', outer_pos[0])
+      call search('\%(^\|\S\)\zs\s*\%#')
+      normal! m[
+      call setpos('.', outer_pos[1])
+      call search('\%#.\s*\ze\%($\|\S\)', 'e')
+      let delete_space = (col('.') + 1 == col('$'))
+      normal! v`["ad
+    else  
+      " Don't use normal! for user-defined objects
+      execute 'silent normal "ad' . scount . 'a' . char
     endif
-    let so = [strpart(outer, 0, idx), strpart(outer, idx + strlen(inner))]
-    let so = map(so, "substitute(v:val, '^\\v\\_s*(.{-})\\_s*$', '\\1', '')")
+
+    let outer = getreg('a')
+    let outertype = getregtype('a')
+
+    let idx = (inner == '') ? 1 : stridx(outer, inner)
+    let len = strlen(inner)
+    let surrounds = [strpart(outer, 0, idx), strpart(outer, idx + len)]
+
+    if spc
+      if innertype ==# 'V'
+        let mlist = matchlist(surrounds[0], '^\v(.{-})(\_s*)$')
+        let surrounds[0] = mlist[1]
+        let inner = mlist[2] . inner
+
+        let mlist = matchlist(surrounds[1], '^\v(\_s*)(.{-})$')
+        if delete_space
+          let surrounds[1] = mlist[1] . mlist[2]
+        else
+          let inner = inner . mlist[1]
+          let surrounds[1] = mlist[2]
+        endif
+      else " innertype ==# 'v'
+        let mlist = matchlist(inner, '^\v(\s*)(.{-})(\s*)$')
+        let inner = mlist[2]
+        let surrounds[0] = surrounds[0] . mlist[1]
+        let surrounds[1] = mlist[3] . surrounds[1]
+      endif
+      call setreg('x', surrounds[1])
+      if surrounds[1][0] == "\n"
+        let surrounds[1] = surrounds[1][1:]
+        let after = "\n"
+      endif
+      if surrounds[1][-1] == "\n"
+        let surrounds[1] = surrounds[1][:-2]
+        let after = "\n"
+      endif
+    else
+      let mlist = matchlist(surrounds[0], '^\v(\_s*)(.{-})(\_s*)$')
+      let before = mlist[1]
+      let surrounds[0] = mlist[2]
+      let inner = mlist[3] . inner
+
+      let mlist = matchlist(surrounds[1], '^\v(\_s*)(.{-})(\_s*)$')
+      let inner = inner . mlist[1]
+      let surrounds[1] = mlist[2]
+      let after = mlist[3]
+    endif
   endif
 
-  call setpos('.', outer_pos[1])
-  normal! m]
-  call setpos('.', outer_pos[0])
-  silent normal! "ad']
+  let pcmd = (col("']") == col("$") && col(".") + 1 == col("$")) ? "p" : "P"
 
-  let block = getreg('a')
-  let idx = stridx(block, inner)
-  let left = strpart(block, 0, idx)
-  let right = strpart(block, idx + strlen(inner))
-
-  let pcmd = (line("']") == line("$") && line('.') + 1 == line('$')) ? "p" : "P"
-
-  let idx = strridx(left, so[0])
-  let llist = matchlist(strpart(left, 0, idx), '^\v(.{-})(\s*)$')
-  let llist = [llist[1], llist[2], strpart(left, idx + strlen(so[0]))]
-
-  let idx = stridx(right, so[1])
-  let rlist = matchlist(strpart(right, idx + strlen(so[1])), '^\v(\s*)(.{-})$')
-  let rlist = [strpart(right, 0, idx), rlist[1], rlist[2]]
-
-  if spc
-    let mlist = matchlist(inner, '^\v(\s*)(.{-})(\s*)$')
-
-    let before = llist[0]
-    let after = ''
-    let removed = ''
-    let keeper = ''
-
-    if llist[2] == "\n"
-      let removed .= llist[1]
-    else
-      let keeper .= llist[1]
-    endif
-
-    let removed .= so[0]
-    let keeper .= llist[2]
-
-    if llist[2] == "\n"
-      let keeper .= mlist[1]
-    else
-      let removed .= mlist[1]
-    endif
-
-    let keeper .= mlist[2]
-
-    if mlist[3] =~ '\n$'
-      let keeper .= mlist[3]
-    else
-      let removed .= mlist[3]
-    endif
-
-    if rlist[2] == "\n"
-      let removed .= substitute(rlist[0], '\_S', '', 'g')
-      let after .= substitute(rlist[0], '\s', '', 'g')
-    else
-      let keeper .= rlist[0]
-    endif
-
-    let removed .= so[1] . rlist[1]
-    let after .= rlist[2]
-  else
-    let before = llist[0] . llist[1]
-    let keeper = llist[2] . inner . rlist[0]
-    let after = rlist[1] . rlist[2]
-    let removed = so[0] . so[1]
-  endif
-
-  call setreg('a', keeper, 'v')
+  call setreg('a', inner, 'v')
   if newchar != ""
     call s:wrapreg('a', newchar)
   endif
-  let surrounded = getreg('a')
-  call setreg('a', before . getreg('a') . after, 'V')
+  call setreg('a', before . getreg('a') . after, outertype)
 
   execute 'silent normal! "a' . pcmd
 
@@ -477,8 +480,8 @@ function! s:dosurround(...) " {{{1
     call s:reindent()
   endif
 
-  call setreg('"', removed)
-  let s:lastdel = removed
+  let s:lastdel = join(surrounds, '')
+  call setreg('"', s:lastdel)
 
   call setreg('a', reg_save[0], reg_save[1])
   let &selection = sel_save
