@@ -430,7 +430,6 @@ function! s:dosurround(...) " {{{1
         let surrounds[0] = surrounds[0] . mlist[1]
         let surrounds[1] = mlist[3] . surrounds[1]
       endif
-      call setreg('x', surrounds[1])
       if surrounds[1][0] == "\n"
         let surrounds[1] = surrounds[1][1:]
         let after = "\n"
