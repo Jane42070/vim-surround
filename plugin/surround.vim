@@ -645,14 +645,10 @@ let s:surround_default_objects = {
 \}
 
 if !exists("g:surround_objects")
-  let g:surround_objects = s:surround_default_objects
-elseif !exists("g:surround_no_default_objects") ||
-\      !g:surround_no_default_objects
-  for [key, val] in items(s:surround_default_objects)
-    if !has_key(g:surround_objects, key)
-      let g:surround_objects[key] = val
-    endif
-  endfor
+  let g:surround_objects = {}
+endif
+if !exists("g:surround_no_default_objects") || !g:surround_no_default_objects
+  call extend(g:surround_objects, s:surround_default_objects, "keep")
 endif
 
 nnoremap <silent> <Plug>Dsurround  :<C-U>call <SID>dosurround(<SID>inputtarget())<CR>
