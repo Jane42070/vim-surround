@@ -451,7 +451,12 @@ function! s:dosurround(...) " {{{1
     endif
   endif
 
-  let pcmd = (col("']") == col("$") && col(".") + 1 == col("$")) ? "p" : "P"
+  if (col("']") == col("$") && col('.') + 1 == col('$')) ||
+  \  (line("']") == line('$') + 1 && line('.') == line('$'))
+    let pcmd = 'p'
+  else
+    let pcmd = 'P'
+  endif
 
   call setreg('a', inner, 'v')
   if newchar != ""
