@@ -464,6 +464,7 @@ function! s:dosurround(...) " {{{1
   endif
   call setreg('a', before . getreg('a') . after, outertype)
 
+  undojoin
   execute 'silent normal! "a' . pcmd
 
   if before != ''
