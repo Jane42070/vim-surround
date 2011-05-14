@@ -140,6 +140,19 @@ function! s:fixindent(str,spc)
   return str
 endfunction
 
+function! s:getpcmd(type)
+  if a:type ==# 'V'
+    if line("']") == line("$") + 1 && line(".") == line("$")
+      return 'p'
+    endif
+  else
+    if col("']") == col("$") && col('.') + 1 == col('$')
+      return 'p'
+    endif
+  endif
+  return 'P'
+endfunction
+
 function! s:process(string)
   let i = 0
   while i < 7
@@ -451,12 +464,7 @@ function! s:dosurround(...) " {{{1
     endif
   endif
 
-  if (col("']") == col("$") && col('.') + 1 == col('$')) ||
-  \  (line("']") == line('$') + 1 && line('.') == line('$'))
-    let pcmd = 'p'
-  else
-    let pcmd = 'P'
-  endif
+  let pcmd = s:getpcmd(outertype)
 
   call setreg('a', inner, 'v')
   if newchar != ""
@@ -556,12 +564,7 @@ function! s:opfunc(type,...) " {{{1
   call setreg(reg,keeper,type)
   call s:wrapreg(reg,char,blockmode)
   call setreg(reg,before.getreg(reg).after,otype)
-  if (col("']") == col("$") && col('.') + 1 == col('$')) ||
-  \  (line("']") == line('$') + 1 && line('.') == line('$'))
-    let pcmd = 'p'
-  else
-    let pcmd = 'P'
-  endif
+  let pcmd = s:getpcmd(otype)
   exe 'norm! "'.reg.pcmd.'`['
   if type ==# 'V' || (getreg(reg) =~ '\n' && type ==# 'v')
     call s:reindent()
