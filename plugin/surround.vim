@@ -146,7 +146,8 @@ function! s:getpcmd(type)
       return 'p'
     endif
   else
-    if col("']") == col("$") && col('.') + 1 == col('$')
+    if col("']") == col("$") && col('.') + 1 == col('$') ||
+    \  col('.') + 1 < col('$')
       return 'p'
     endif
   endif
