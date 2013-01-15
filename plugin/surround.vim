@@ -133,16 +133,6 @@ function! s:repeat(str,count)
   return str
 endfunction
 
-function! s:fixindent(str,spc)
-  let str = substitute(a:str,'\t',s:repeat(' ',&sw),'g')
-  let spc = substitute(a:spc,'\t',s:repeat(' ',&sw),'g')
-  let str = substitute(str,'\(\n\|\%^\).\@=','\1'.spc,'g')
-  if ! &et
-    let str = substitute(str,'\s\{'.&ts.'\}',"\t",'g')
-  endif
-  return str
-endfunction
-
 function! s:getpcmd(type)
   if a:type ==# 'V'
     if line("']") == line("$") + 1 && line(".") == line("$")
@@ -205,8 +195,8 @@ function! s:wrap(string,char,type,...)
   let keeper = a:string
   let newchar = a:char
   let type = a:type
-  let linemode = type ==# 'V' ? 1 : 0
   let special = a:0 ? a:1 : 0
+  let indent = a:0 > 1 ? a:2 : ''
   let before = ""
   let after  = ""
 
@@ -214,15 +204,7 @@ function! s:wrap(string,char,type,...)
   let extraspace = mlist[1]
   let newchar = mlist[2]
 
-  if type ==# "V"
-    let initspaces = matchstr(keeper,'\%^\s*')
-  else
-    let initspaces = matchstr(getline('.'),'\%^\s*')
-  endif
-  if newchar == ' '
-    let before = ''
-    let after  = ''
-  elseif exists("b:surround_objects") && has_key(b:surround_objects, newchar)
+  if exists("b:surround_objects") && has_key(b:surround_objects, newchar)
     let all    = s:process(b:surround_objects[newchar])
     let before = s:extractbefore(all)
     let after  =  s:extractafter(all)
@@ -237,36 +219,73 @@ function! s:wrap(string,char,type,...)
     let before = ''
     let after  = ''
   endif
-  "let before = substitute(before,'\n','\n'.initspaces,'g')
-  let after  = substitute(after ,'\n','\n'.initspaces,'g')
-  "let after  = substitute(after,"\n\\s*\<C-U>\\s*",'\n','g')
-  if type ==# 'V' || (special && type ==# "v")
-    let before = substitute(before,' \+$','','')
-    let after  = substitute(after ,'^ \+','','')
-    if after !~ '^\n'
-      let after  = initspaces.after
+
+  let before = substitute(before,'\n\ze\_S','\n'.indent,'g')
+  let after  = substitute(after ,'\n\ze\_S','\n'.indent,'g')
+
+  let before = substitute(before,'\n\s\+','\n','')
+  let after  = substitute(after, '\n\s\+','\n','')
+
+  if special
+    "
+    " Fixup the beginning of the 'before'
+    "
+    if before =~ '^\n'
+      if type ==# 'V'
+        " In line-wise mode, ignore the newline at the beginning of 'before'
+        " because it already exists.  This also means "don't indent 'before'."
+        let before = strpart(before, 1)
+      endif
+    else
+      if type ==# 'V'
+        " In line-wise mode, indent 'before' at the same level of first line.
+        let before = indent . before
+      endif
     endif
-    if keeper !~ '\n$' && after !~ '^\n'
-      let keeper = keeper . "\n"
-    elseif keeper =~ '\n$' && after =~ '^\n'
-      let after = strpart(after,1)
+
+    "
+    " Fixup the end of the 'before'
+    "
+    if before !~ '\n$'
+      " In special mode, a newlines is required before the content.
+      let before = substitute(before,' \+$','','') . "\n"
     endif
-    if before !~ '\n\s*$'
-      let before = before . "\n" . initspaces
-    endif
-  endif
-  if type ==# 'V'
-    let before = initspaces.before
-  endif
-  if before =~ '\n\s*\%$'
     if type ==# 'v'
-      let keeper = initspaces.keeper
+      " In char-wise mode, indent the content.
+      let before = before . indent
     endif
-    let padding = matchstr(before,'\n\zs\s\+\%$')
-    let before  = substitute(before,'\n\s\+\%$','\n','')
-    let keeper = s:fixindent(keeper,padding)
+
+    "
+    " Fixup the beginning of the 'after'
+    "
+    if after =~ '^\n'
+      if type ==# 'V'
+        " In line-wise mode, ignore the newline at the beginning of the
+        " 'after'.  because it already exists.  This also means "don't indent
+        " 'after'."
+        let after = strpart(after, 1)
+      endif
+    else
+      " In special mode, indent the 'after' at the same level of first line.
+      let after  = indent . substitute(after ,'^ \+','','')
+      if type ==# 'v'
+        " In char-wise mode, a newline is required after the content.
+        let after = "\n" . after
+      endif
+    endif
+
+    "
+    " Fixup the end of the 'after'
+    "
+    if after !~ '\n$'
+      if type ==# 'V'
+        " In line-wise mode, add the newline at the end of 'after'.
+        let after = after . "\n"
+      endif
+    endif
   endif
-  if type ==# 'V'
+
+  if special
     let keeper = before.keeper.after
   elseif type =~ "^\<C-V>"
     " Really we should be iterating over the buffer
@@ -284,7 +303,8 @@ function! s:wrapreg(reg,char,...)
   let orig = getreg(a:reg)
   let type = substitute(getregtype(a:reg),'\d\+$','','')
   let special = a:0 ? a:1 : 0
-  let new = s:wrap(orig,a:char,type,special)
+  let indent = a:0 > 1 ? a:2 : ''
+  let new = s:wrap(orig,a:char,type,special,indent)
   call setreg(a:reg,new,type)
 endfunction
 " }}}1
@@ -530,12 +550,16 @@ function! s:opfunc(type,...) " {{{1
   let reg_type = getregtype(reg)
   let blockmode = a:0 && a:1
   if a:type == "char"
+    let indent = matchstr(getline("'["), '^\s*')
     silent exe 'norm! `[v`]"'.reg.'d'
   elseif a:type == "line"
+    let indent = matchstr(getline("'["), '^\s*')
     silent exe 'norm! `[V`]"'.reg.'d'
   elseif a:type =~ '^\d\+$'
+    let indent = matchstr(getline("."), '^\s*')
     silent exe 'norm! "'.reg.a:type.'dd'
   elseif a:type ==# "v" || a:type ==# "V" || a:type ==# "\<C-V>"
+    let indent = matchstr(getline("'<"), '^\s*')
     let ve = &virtualedit
     if !blockmode
       set virtualedit=
@@ -560,7 +584,7 @@ function! s:opfunc(type,...) " {{{1
     let after = mlist[3]
   endif
   call setreg(reg,keeper,type)
-  call s:wrapreg(reg,char,blockmode)
+  call s:wrapreg(reg,char,blockmode,indent)
   call setreg(reg,before.getreg(reg).after,otype)
   let pcmd = s:getpcmd(otype)
   exe 'norm! "'.reg.pcmd.'`['
@@ -640,7 +664,7 @@ let s:surround_default_objects = {
 \  "<":      "<\r>",
 \  ">":      "< \r >",
 \  "a":      "<\r>",
-\  "p":      "\n\r\n\n",
+\  "p":      "\n\n\r\n\n",
 \  "s":      " \r ",
 \  "t":      "<\1tag: \1>\r</\1\r\\s.*$\r\1>",
 \  "T":      "<\1\es:dotag()\1>\r</\1\r\\s.*$\r\1>",
