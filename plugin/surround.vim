@@ -489,10 +489,6 @@ function! s:dosurround(...) " {{{1
 
   normal! `[
 
-  if outer =~ '\n'
-    call s:reindent()
-  endif
-
   let s:lastdel = join(surrounds, '')
   call setreg('"', s:lastdel)
 
@@ -566,9 +562,6 @@ function! s:opfunc(type,...) " {{{1
   call setreg(reg,before.getreg(reg).after,otype)
   let pcmd = s:getpcmd(otype)
   exe 'norm! "'.reg.pcmd.'`['
-  if type ==# 'V' || (getreg(reg) =~ '\n' && type ==# 'v')
-    call s:reindent()
-  endif
   if blockmode && char =~ '^ '
     let [spos, epos] = [getpos("'["), getpos("']")]
 
@@ -585,6 +578,9 @@ function! s:opfunc(type,...) " {{{1
 
     let epos[1] -= 1
     call setpos("']", epos)
+  endif
+  if blockmode
+    call s:reindent()
   endif
   call setreg(reg,reg_save,reg_type)
   let &selection = sel_save
