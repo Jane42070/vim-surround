@@ -66,14 +66,17 @@ endfunction
 
 function! s:inputreplacement()
   "echo '-- SURROUND --'
-  let c = s:getchar()
-  if c == " "
-    let c = c . s:getchar()
-  endif
+  let c = ""
+  while 1
+    let c .= s:getchar()
+    if c !~ " $"
+      break
+    endif
+  endwhile
   if c =~ "\<Esc>" || c =~ "\<C-C>"
     return ""
   endif
-  let r = substitute(c, '^ \?', '', '')
+  let r = substitute(c, '\v^ *', '', '')
   let list = keys(g:surround_objects)
   while 1
     let list = filter(list, "v:val =~# '^\\V' . r")
@@ -206,16 +209,15 @@ function! s:wrap(string,char,type,...)
   let special = a:0 ? a:1 : 0
   let before = ""
   let after  = ""
+
+  let mlist = matchlist(newchar, '\v^( *)(.*)$')
+  let extraspace = mlist[1]
+  let newchar = mlist[2]
+
   if type ==# "V"
     let initspaces = matchstr(keeper,'\%^\s*')
   else
     let initspaces = matchstr(getline('.'),'\%^\s*')
-  endif
-  " Duplicate b's are just placeholders (removed)
-  let extraspace = ""
-  if newchar =~ '^ '
-    let newchar = strpart(newchar,1)
-    let extraspace = ' '
   endif
   if newchar == ' '
     let before = ''
