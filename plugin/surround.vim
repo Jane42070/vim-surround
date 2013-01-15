@@ -564,16 +564,18 @@ function! s:opfunc(type,...) " {{{1
   call setreg(reg,before.getreg(reg).after,otype)
   let pcmd = s:getpcmd(otype)
   exe 'norm! "'.reg.pcmd.'`['
-  if blockmode && char =~ '^ '
+  if type ==# 'V' && blockmode && char =~ '^ '
     let [spos, epos] = [getpos("'["), getpos("']")]
 
-    call setpos('.', epos)
-    let trim = getline(line('.') + 1) =~# '^\s*$'
-    norm! J
-    if trim && getline('.')[col('.')-1] =~ '\s'
-      norm! x
+    if char =~ '^  '
+      call setpos('.', epos)
+      let trim = getline(line('.') + 1) =~# '^\s*$'
+      norm! J
+      if trim && getline('.')[col('.')-1] =~ '\s'
+        norm! x
+      endif
+      let epos = getpos(".")
     endif
-    let epos = getpos(".")
 
     call setpos('.', spos)
     norm! kJm[
