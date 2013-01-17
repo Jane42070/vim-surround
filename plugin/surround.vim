@@ -84,10 +84,13 @@ function! s:inputtarget()
   let space = ''
 
   let c = s:getchar()
-  while c =~ '\d'
-    let cnt .= c
-    let c = s:getchar()
-  endwhile
+
+  if !g:surround_ignore_target_count
+    while c =~ '\d'
+      let cnt .= c
+      let c = s:getchar()
+    endwhile
+  endif
 
   if c == " "
     let space = ' '
@@ -102,7 +105,7 @@ function! s:inputtarget()
 
   if strlen(target) == 1 && stridx(builtins, target) != -1 &&
   \  mapcheck('a' . target, 'o') == '' && mapcheck('i' . target, 'o') == ''
-    return cnt . space . target
+    return [cnt, space, target]
   endif
 
   while mapcheck('a' . target, 'o') != '' && maparg('a' . target, 'o') == '' &&
@@ -114,7 +117,7 @@ function! s:inputtarget()
     let target .= c
   endwhile
 
-  return cnt . space . target
+  return [cnt, space, target]
 endfunction
 
 function! s:inputreplacement()
@@ -415,13 +418,12 @@ endfunction
 " Normal and Visual mode functions {{{1
 
 function! s:dosurround(...)
-  let tseq = a:0 > 0 ? a:1 : s:inputtarget()
+  let target = a:0 > 0 ? a:1 : s:inputtarget()
   let rseq = a:0 > 1 ? a:2 : ''
 
-  let mlist = matchlist(tseq, '\v^(\d*)( ?)(.*)$')
-  let tcount = v:count1 * (mlist[1] == "" ? 1 : mlist[1])
-  let tspace = mlist[2] == ' '
-  let tseq = mlist[3]
+  let tcount = v:count1 * (target[0] == "" ? 1 : target[0])
+  let tspace = len(target[1])
+  let tseq = target[2]
 
   if tseq == ''
     return
@@ -744,6 +746,9 @@ if !exists("g:surround_no_default_objects") || !g:surround_no_default_objects
 endif
 if !exists("g:surround_indent")
   let g:surround_indent = 1
+endif
+if !exists("g:surround_ignore_target_count")
+  let g:surround_ignore_target_count = 0
 endif
 
 nnoremap <silent> <Plug>SurroundRepeat .
