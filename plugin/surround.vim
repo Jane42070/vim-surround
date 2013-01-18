@@ -438,17 +438,22 @@ function! s:dosurround(...)
   undojoin
   execute 'silent normal! "a' . pcmd
 
+  let ww_save = &whichwrap
+  let &whichwrap = "b,s"
+
   if before != ''
     normal! `[
-    execute 'normal! ' . strlen(before) . 'l'
+    execute 'normal! ' . strlen(before) . "\<Space>"
     normal! m[
   endif
 
   if after != ''
     normal! `]
-    execute 'normal! ' . strlen(after) . 'h'
+    execute 'normal! ' . strlen(after) . "\<BS>"
     normal! m]
   endif
+
+  let &whichwrap = ww_save
 
   normal! `[
 
