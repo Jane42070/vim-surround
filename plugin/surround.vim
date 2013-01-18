@@ -13,48 +13,56 @@ set cpo&vim
 
 " Surround object {{{1
 
+let s:null_sobj = {'left': '', 'right': '', 'nspaces': 0, 'reindent': 0}
+
 function! s:get_surround_object(seq)
-  let null_sobj = {'left': '', 'right': '', 'nspaces': 0, 'reindent': 0}
+  let [spaces, reindent, key] = a:seq
 
-  let mlist = matchlist(a:seq, "\\v^( *)([\<C-d>\<C-t>]?)(.*)$")
-  let extraspaces = len(mlist[1])
-  let reindent = mlist[2]
-  let char = mlist[3]
-
-  if exists("b:surround_objects") && has_key(b:surround_objects, char)
-    let raw_sobj = b:surround_objects[char]
-  elseif has_key(g:surround_objects, char)
-    let raw_sobj = g:surround_objects[char]
-  else
-    if char !~ '\a'
-      let raw_sobj = char . "\r" . char
-    else
-      return null_sobj
-    endif
+  let sobj = s:_get_surround_object(key)
+  if sobj == s:null_sobj
+    return sobj
   endif
 
-  if type(raw_sobj) == type({})
-    let sobj = copy(raw_sobj)
-  elseif type(raw_sobj) == type('')
-    " Backward compatibility
-    let raw_sobj = s:process(raw_sobj)
-    let sobj = {'left': s:extractbefore(raw_sobj),
-    \           'right': s:extractafter(raw_sobj),
-    \           'nspaces': 0, 'reindent': 1}
-  else
-    return null_sobj
-  endif
+  let sobj['nspaces'] += len(spaces)
 
-  let sobj['nspaces'] += extraspaces
   if reindent == "\<C-t>"
     let sobj['reindent'] = 1
   elseif reindent == "\<C-d>"
     let sobj['reindent'] = 0
   endif
 
-  let Func = get(sobj, 'inputfunc', 0)
-  if type(Func) == type(function('tr'))
-    let values = call(Func, get(sobj, 'inputfuncargs', []))
+  return sobj
+endfunction
+
+function! s:_get_surround_object(key)
+  if exists("b:surround_objects") && has_key(b:surround_objects, a:key)
+    let raw_sobj = b:surround_objects[a:key]
+  elseif has_key(g:surround_objects, a:key)
+    let raw_sobj = g:surround_objects[a:key]
+  elseif a:key !~ '\a'
+    let raw_sobj = a:key . "\r" . a:key
+  else
+    return s:null_sobj
+  endif
+
+  if type(raw_sobj) == type({})
+    return copy(raw_sobj)
+  elseif type(raw_sobj) == type('')
+    " Backward compatibility
+    let raw_sobj = s:process(raw_sobj)
+    return {'left': s:extractbefore(raw_sobj),
+    \       'right': s:extractafter(raw_sobj),
+    \       'nspaces': 0, 'reindent': 1}
+  else
+    return s:null_sobj
+  endif
+endfunction
+
+function! s:resolve(sobj)
+  let sobj = a:sobj
+
+  if has_key(sobj, 'inputfunc')
+    let values = call(sobj['inputfunc'], get(sobj, 'inputfuncargs', []))
 
     for i in range(len(values))
       let sobj['left']  = substitute(sobj['left'],  nr2char(i+1), values[i],'g')
@@ -64,136 +72,6 @@ function! s:get_surround_object(seq)
 
   return sobj
 endfunction
-
-" }}}1
-
-" Input functions {{{1
-
-function! s:getchar()
-  let c = getchar()
-  if c =~ '^\d\+$'
-    let c = nr2char(c)
-  endif
-  return c
-endfunction
-
-function! s:inputtarget()
-  let builtins = "wWsp[]()b<>t{}B\"'`"
-
-  let cnt = ''
-  let space = ''
-
-  let c = s:getchar()
-
-  if !g:surround_ignore_target_count
-    while c =~ '\d'
-      let cnt .= c
-      let c = s:getchar()
-    endwhile
-  endif
-
-  if c == " "
-    let space = ' '
-    let c = s:getchar()
-  endif
-
-  if c == "\<Esc>" || c == "\<C-c>"
-    return ""
-  endif
-
-  let target = c
-
-  if strlen(target) == 1 && stridx(builtins, target) != -1 &&
-  \  mapcheck('a' . target, 'o') == '' && mapcheck('i' . target, 'o') == ''
-    return [cnt, space, target]
-  endif
-
-  while mapcheck('a' . target, 'o') != '' && maparg('a' . target, 'o') == '' &&
-  \     mapcheck('a' . target, 'o') != '' && maparg('i' . target, 'o') == ''
-    let c  = s:getchar()
-    if c  == "\<Esc>" || c == "\<C-c>"
-      return ""
-    endif
-    let target .= c
-  endwhile
-
-  return [cnt, space, target]
-endfunction
-
-function! s:inputreplacement()
-  let extraspaces = ''
-  let reindent = ''
-
-  while 1
-    let c = s:getchar()
-    if c == ' '
-      let extraspaces .= c
-    elseif c == "\<C-d>" || c == "\<C-t>"
-      let reindent = c
-    elseif c == "\<Esc>" || c == "\<C-c>"
-      return ""
-    else
-      break
-    endif
-  endwhile
-
-  let replacement = c
-  let list = keys(g:surround_objects)
-
-  while 1
-    let list = filter(list, "v:val =~# '^\\V' . replacement")
-    if len(list) == 0 || (len(list) == 1 && list[0] == replacement)
-      break
-    endif
-    let c = s:getchar()
-    if c == "\<Esc>" || c == "\<C-c>"
-      return ""
-    endif
-    let replacement .= c
-  endwhile
-
-  return extraspaces . reindent . replacement
-endfunction
-
-function! s:simple_input(...)
-  let args = a:0 == 0 ? ['input: '] : a:000
-  let values = []
-
-  for i in args
-    call add(values, input(i))
-  endfor
-
-  return values
-endfunction
-
-function! s:tag_input()
-  let values = s:simple_input('tag: ')
-  call add(values, substitute(values[0], '\s.*', '', ''))
-  return values
-endfunction
-
-function! s:tag_input_lastdel()
-  let last = exists("s:lastdel") ? s:lastdel : ''
-  let default = matchstr(last, '<\zs.\{-\}\ze>')
-  let values = [input('tag: ', default)]
-  call add(values, substitute(values[0], '\s.*', '', ''))
-  return values
-endfunction
-
-function! s:latex_input()
-  let pairs = "[](){}<>"
-  let env = input('\begin{')
-  let env = '{' . env
-  let tail = matchstr(env, '\v.[^\[\]()){}}<>]+$')
-  if tail != ""
-    let env .= pairs[stridx(pairs, tail[0]) + 1]
-  endif
-  return [env, substitute(env, '[^}]*$', '', '')]
-endfunction
-
-" }}}1
-
-" Wrapping functions {{{1
 
 " Functions for backward compatibility {{{2
 
@@ -259,6 +137,136 @@ function! s:process(string)
 endfunction
 
 " }}}2
+
+" }}}1
+
+" Input functions {{{1
+
+function! s:getchar()
+  let c = getchar()
+  if c =~ '^\d\+$'
+    let c = nr2char(c)
+  endif
+  return c
+endfunction
+
+function! s:inputtarget()
+  let builtins = "wWsp[]()b<>t{}B\"'`"
+
+  let cnt = ''
+  let space = ''
+
+  let c = s:getchar()
+
+  if !g:surround_ignore_target_count
+    while c =~ '\d'
+      let cnt .= c
+      let c = s:getchar()
+    endwhile
+  endif
+
+  if c == " "
+    let space = ' '
+    let c = s:getchar()
+  endif
+
+  if c == "\<Esc>" || c == "\<C-c>"
+    return []
+  endif
+
+  let target = c
+
+  if strlen(target) == 1 && stridx(builtins, target) != -1 &&
+  \  mapcheck('a' . target, 'o') == '' && mapcheck('i' . target, 'o') == ''
+    return [cnt, space, target]
+  endif
+
+  while mapcheck('a' . target, 'o') != '' && maparg('a' . target, 'o') == '' &&
+  \     mapcheck('a' . target, 'o') != '' && maparg('i' . target, 'o') == ''
+    let c  = s:getchar()
+    if c  == "\<Esc>" || c == "\<C-c>"
+      return []
+    endif
+    let target .= c
+  endwhile
+
+  return [cnt, space, target]
+endfunction
+
+function! s:inputreplacement()
+  let spaces = ''
+  let reindent = ''
+
+  while 1
+    let c = s:getchar()
+    if c == ' '
+      let spaces .= c
+    elseif c == "\<C-d>" || c == "\<C-t>"
+      let reindent = c
+    elseif c == "\<Esc>" || c == "\<C-c>"
+      return []
+    else
+      break
+    endif
+  endwhile
+
+  let replacement = c
+  let list = keys(g:surround_objects)
+
+  while 1
+    let list = filter(list, "v:val =~# '^\\V' . replacement")
+    if len(list) == 0 || (len(list) == 1 && list[0] == replacement)
+      break
+    endif
+    let c = s:getchar()
+    if c == "\<Esc>" || c == "\<C-c>"
+      return []
+    endif
+    let replacement .= c
+  endwhile
+
+  return [spaces, reindent, replacement]
+endfunction
+
+function! s:simple_input(...)
+  let args = a:0 == 0 ? ['input: '] : a:000
+  let values = []
+
+  for i in args
+    call add(values, input(i))
+  endfor
+
+  return values
+endfunction
+
+function! s:tag_input()
+  let values = s:simple_input('tag: ')
+  call add(values, substitute(values[0], '\s.*', '', ''))
+  return values
+endfunction
+
+function! s:tag_input_lastdel()
+  let last = exists("s:lastdel") ? s:lastdel : ''
+  let default = matchstr(last, '<\zs.\{-\}\ze>')
+  let values = [input('tag: ', default)]
+  call add(values, substitute(values[0], '\s.*', '', ''))
+  return values
+endfunction
+
+function! s:latex_input()
+  let pairs = "[](){}<>"
+  let env = input('\begin{')
+  let env = '{' . env
+  let tail = matchstr(env, '\v.[^\[\]()){}}<>]+$')
+  if tail != ""
+    let env .= pairs[stridx(pairs, tail[0]) + 1]
+  endif
+  return [env, substitute(env, '[^}]*$', '', '')]
+endfunction
+
+" }}}1
+
+" Wrapping functions {{{1
 
 function! s:wrap(sobj, inner, type, special, indent)
   let left = a:sobj['left']
@@ -367,14 +375,14 @@ function! s:insert(...)
   " Optional argument causes the result to appear on 3 lines, not 1
   "call inputsave()
   let linemode = a:0 ? a:1 : 0
-  let char = s:inputreplacement()
-  while char == "\<CR>" || char == "\<C-S>"
+  let rseq = s:inputreplacement()
+  while rseq[2] == "\<CR>" || rseq[2] == "\<C-S>"
     " TODO: use total count for additional blank lines
     let linemode = linemode + 1
-    let char = s:inputreplacement()
+    let rseq = s:inputreplacement()
   endwhile
   "call inputrestore()
-  if char == ""
+  if rseq == []
     return ""
   endif
   "call inputsave()
@@ -382,7 +390,8 @@ function! s:insert(...)
   set clipboard-=unnamed
   let reg_save = @@
   call setreg('"',"\r",'v')
-  let sobj = s:get_surround_object(char)
+  let sobj = s:get_surround_object(rseq)
+  call s:resolve(sobj)
   call s:wrapreg(sobj,'"',linemode)
   " If line mode is used and the surrounding consists solely of a suffix,
   " remove the initial newline.  This fits a use case of mine but is a
@@ -419,7 +428,7 @@ endfunction
 
 function! s:dosurround(...)
   let target = a:0 > 0 ? a:1 : s:inputtarget()
-  let rseq = a:0 > 1 ? a:2 : ''
+  let rseq = a:0 > 1 ? a:2 : []
 
   let tcount = v:count1 * (target[0] == "" ? 1 : target[0])
   let tspace = len(target[1])
@@ -539,8 +548,9 @@ function! s:dosurround(...)
   let pcmd = s:getpcmd(outertype)
 
   call setreg('a', inner, 'v')
-  if rseq != ""
+  if rseq != []
     let sobj = s:get_surround_object(rseq)
+    call s:resolve(sobj)
     call s:wrapreg(sobj, 'a')
   endif
   call setreg('a', before . getreg('a') . after, outertype)
@@ -568,7 +578,7 @@ function! s:dosurround(...)
   call setreg('a', reg_save[0], reg_save[1])
   let &selection = sel_save
 
-  if rseq == ""
+  if rseq == []
     silent! call repeat#set("\<Plug>Dsurround" . tseq, tcount)
   else
     silent! call repeat#set("\<Plug>Csurround" . tseq . rseq, tcount)
@@ -577,11 +587,11 @@ endfunction
 
 function! s:changesurround()
   let a = s:inputtarget()
-  if a == ""
+  if a == []
     return ""
   endif
   let b = s:inputreplacement()
-  if b == ""
+  if b == []
     return ""
   endif
   call s:dosurround(a,b)
@@ -591,7 +601,7 @@ function! s:opfunc(type, ...)
   let blockmode = a:0 > 0 ? a:1 : 0
 
   let rseq = s:inputreplacement()
-  if rseq == ""
+  if rseq == []
     return ""
   endif
 
@@ -637,6 +647,7 @@ function! s:opfunc(type, ...)
 
   call setreg('a', inner, type)
   let sobj = s:get_surround_object(rseq)
+  call s:resolve(sobj)
   call s:wrapreg(sobj, 'a', blockmode, indent)
 
   call setreg('a', before . getreg('a') . after, otype)
@@ -673,9 +684,10 @@ function! s:opfunc(type, ...)
 
   if a:type =~ '^\d\+$'
     silent! call repeat#set(
-    \ "\<Plug>Y" . (blockmode ? "gs" : "s") . "surround" . rseq, a:type)
+    \ "\<Plug>Y" . (blockmode ? "gs" : "s") . "surround" . join(rseq, ''),
+    \ a:type)
   else
-    silent! call repeat#set("\<Plug>SurroundRepeat" . rseq)
+    silent! call repeat#set("\<Plug>SurroundRepeat" . join(rseq, ''))
   endif
 endfunction
 
