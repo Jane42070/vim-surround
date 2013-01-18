@@ -344,9 +344,10 @@ function! s:dosurround(...)
   let &selection = sel_save
 
   if rseq == []
-    silent! call repeat#set("\<Plug>Dsurround" . tseq, tcount)
+    silent! call repeat#set("\<Plug>Dsurround" . join(target, ''), tcount)
   else
-    silent! call repeat#set("\<Plug>Csurround" . tseq . rseq, tcount)
+    silent! call repeat#set("\<Plug>Csurround" . join(target, '') .
+    \                       join(rseq, ''), tcount)
   endif
 endfunction
 
