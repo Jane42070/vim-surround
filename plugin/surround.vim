@@ -62,7 +62,7 @@ function! s:wrap(sobj, inner, type, special, indent)
     " Fixup the end of the 'left'
     "
     if left !~ '\n$'
-      " In special mode, a newlines is required left the content.
+      " In special mode, a newlines is required before the content.
       let left = substitute(left,' \+$','','') . "\n"
     endif
     if a:type ==# 'v'
@@ -84,7 +84,7 @@ function! s:wrap(sobj, inner, type, special, indent)
       " In special mode, indent the 'right' at the same level of first line.
       let right  = a:indent . substitute(right ,'^ \+','','')
       if a:type ==# 'v'
-        " In char-wise mode, a newline is required right the content.
+        " In char-wise mode, a newline is required after the content.
         let right = "\n" . right
       endif
     endif
