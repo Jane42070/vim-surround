@@ -140,3 +140,161 @@ endfunction
 " }}}2
 
 " }}}1
+
+" Input functions {{{1
+
+function! s:getchar()
+    let c = getchar()
+    if c =~ '^\d\+$'
+        let c = nr2char(c)
+    endif
+    return c
+endfunction
+
+function! surround#inputtarget()
+    let builtins = "wWsp[]()b<>t{}B\"'`"
+
+    let cnt = ''
+    let space = ''
+
+    let c = s:getchar()
+
+    if !g:surround_ignore_target_count
+        while c =~ '\d'
+            let cnt .= c
+            let c = s:getchar()
+        endwhile
+    endif
+
+    if c == " "
+        let space = ' '
+        let c = s:getchar()
+    endif
+
+    if c == "\<Esc>" || c == "\<C-c>"
+        return []
+    endif
+
+    let target = c
+
+    if strlen(target) == 1 && stridx(builtins, target) != -1 &&
+    \  mapcheck('a' . target, 'o') == '' && mapcheck('i' . target, 'o') == ''
+        return [cnt, space, target]
+    endif
+
+    while mapcheck('a' . target, 'o') != '' && maparg('a' . target, 'o') == ''
+    \  && mapcheck('a' . target, 'o') != '' && maparg('i' . target, 'o') == ''
+        let c  = s:getchar()
+        if c  == "\<Esc>" || c == "\<C-c>"
+            return []
+        endif
+        let target .= c
+    endwhile
+
+    return [cnt, space, target]
+endfunction
+
+function! surround#inputreplacement()
+    let spaces = ''
+    let reindent = ''
+
+    while 1
+        let c = s:getchar()
+        if c == ' '
+            let spaces .= c
+        elseif c == "\<C-d>" || c == "\<C-t>"
+            let reindent = c
+        elseif c == "\<Esc>" || c == "\<C-c>"
+            return []
+        else
+            break
+        endif
+    endwhile
+
+    let replacement = c
+    let list = keys(g:surround_objects)
+
+    while 1
+        let list = filter(list, "v:val =~# '^\\V' . replacement")
+        if len(list) == 0 || (len(list) == 1 && list[0] == replacement)
+            break
+        endif
+        let c = s:getchar()
+        if c == "\<Esc>" || c == "\<C-c>"
+            return []
+        endif
+        let replacement .= c
+    endwhile
+
+    return [spaces, reindent, replacement]
+endfunction
+
+function! surround#simple_input(...)
+    let args = a:0 == 0 ? ['input: '] : a:000
+    let values = []
+
+    try
+        for i in args
+            if type(i) == type([])
+                call add(values, input(i[0], i[1]))
+            else
+                call add(values, input(i))
+            endif
+        endfor
+    catch
+        return []
+    endtry
+
+    return values
+endfunction
+
+function! surround#simple_input1(...)
+    let values = call('surround#simple_input', a:000)
+
+    if len(values) == 1 && values[0] == ''
+        return []
+    else
+        return values
+    endif
+endfunction
+
+function! surround#tag_input()
+    let values = surround#simple_input1('tag: ')
+    if values == []
+        return []
+    endif
+
+    call add(values, substitute(values[0], '\s.*', '', ''))
+    return values
+endfunction
+
+function! surround#tag_input_lastdel()
+    let last = exists("b:surround_lastdel") ? b:surround_lastdel : ''
+    let default = matchstr(last, '<\zs.\{-\}\ze>')
+
+    let values = surround#simple_input(['tag: ', default])
+    if values == []
+        return []
+    endif
+
+    call add(values, substitute(values[0], '\s.*', '', ''))
+    return values
+endfunction
+
+function! surround#latex_input()
+    let pairs = "[](){}<>"
+
+    let values = surround#simple_input1('\begin{')
+    if values == []
+        return []
+    endif
+
+    let env = '{' . values[0]
+    let tail = matchstr(env, '\v.[^\[\]()){}}<>]+$')
+    if tail != ""
+        let env .= pairs[stridx(pairs, tail[0]) + 1]
+    endif
+    return [env, substitute(env, '[^}]*$', '', '')]
+endfunction
+
+" }}}1

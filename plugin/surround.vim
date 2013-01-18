@@ -12,132 +12,6 @@ let s:cpo_save = &cpo
 set cpo&vim
 
 
-" Input functions {{{1
-
-function! s:getchar()
-  let c = getchar()
-  if c =~ '^\d\+$'
-    let c = nr2char(c)
-  endif
-  return c
-endfunction
-
-function! s:inputtarget()
-  let builtins = "wWsp[]()b<>t{}B\"'`"
-
-  let cnt = ''
-  let space = ''
-
-  let c = s:getchar()
-
-  if !g:surround_ignore_target_count
-    while c =~ '\d'
-      let cnt .= c
-      let c = s:getchar()
-    endwhile
-  endif
-
-  if c == " "
-    let space = ' '
-    let c = s:getchar()
-  endif
-
-  if c == "\<Esc>" || c == "\<C-c>"
-    return []
-  endif
-
-  let target = c
-
-  if strlen(target) == 1 && stridx(builtins, target) != -1 &&
-  \  mapcheck('a' . target, 'o') == '' && mapcheck('i' . target, 'o') == ''
-    return [cnt, space, target]
-  endif
-
-  while mapcheck('a' . target, 'o') != '' && maparg('a' . target, 'o') == '' &&
-  \     mapcheck('a' . target, 'o') != '' && maparg('i' . target, 'o') == ''
-    let c  = s:getchar()
-    if c  == "\<Esc>" || c == "\<C-c>"
-      return []
-    endif
-    let target .= c
-  endwhile
-
-  return [cnt, space, target]
-endfunction
-
-function! s:inputreplacement()
-  let spaces = ''
-  let reindent = ''
-
-  while 1
-    let c = s:getchar()
-    if c == ' '
-      let spaces .= c
-    elseif c == "\<C-d>" || c == "\<C-t>"
-      let reindent = c
-    elseif c == "\<Esc>" || c == "\<C-c>"
-      return []
-    else
-      break
-    endif
-  endwhile
-
-  let replacement = c
-  let list = keys(g:surround_objects)
-
-  while 1
-    let list = filter(list, "v:val =~# '^\\V' . replacement")
-    if len(list) == 0 || (len(list) == 1 && list[0] == replacement)
-      break
-    endif
-    let c = s:getchar()
-    if c == "\<Esc>" || c == "\<C-c>"
-      return []
-    endif
-    let replacement .= c
-  endwhile
-
-  return [spaces, reindent, replacement]
-endfunction
-
-function! s:simple_input(...)
-  let args = a:0 == 0 ? ['input: '] : a:000
-  let values = []
-
-  for i in args
-    call add(values, input(i))
-  endfor
-
-  return values
-endfunction
-
-function! s:tag_input()
-  let values = s:simple_input('tag: ')
-  call add(values, substitute(values[0], '\s.*', '', ''))
-  return values
-endfunction
-
-function! s:tag_input_lastdel()
-  let last = exists("s:lastdel") ? s:lastdel : ''
-  let default = matchstr(last, '<\zs.\{-\}\ze>')
-  let values = [input('tag: ', default)]
-  call add(values, substitute(values[0], '\s.*', '', ''))
-  return values
-endfunction
-
-function! s:latex_input()
-  let pairs = "[](){}<>"
-  let env = input('\begin{')
-  let env = '{' . env
-  let tail = matchstr(env, '\v.[^\[\]()){}}<>]+$')
-  if tail != ""
-    let env .= pairs[stridx(pairs, tail[0]) + 1]
-  endif
-  return [env, substitute(env, '[^}]*$', '', '')]
-endfunction
-
-" }}}1
-
 " Wrapping functions {{{1
 
 function! s:wrap(sobj, inner, type, special, indent)
@@ -247,11 +121,11 @@ function! s:insert(...)
   " Optional argument causes the result to appear on 3 lines, not 1
   "call inputsave()
   let linemode = a:0 ? a:1 : 0
-  let rseq = s:inputreplacement()
+  let rseq = surround#inputreplacement()
   while rseq[2] == "\<CR>" || rseq[2] == "\<C-S>"
     " TODO: use total count for additional blank lines
     let linemode = linemode + 1
-    let rseq = s:inputreplacement()
+    let rseq = surround#inputreplacement()
   endwhile
   "call inputrestore()
   if rseq == []
@@ -301,8 +175,12 @@ endfunction
 " Normal and Visual mode functions {{{1
 
 function! s:dosurround(...)
-  let target = a:0 > 0 ? a:1 : s:inputtarget()
+  let target = a:0 > 0 ? a:1 : surround#inputtarget()
   let rseq = a:0 > 1 ? a:2 : []
+
+  if target == []
+    return
+  endif
 
   let tcount = v:count1 * (target[0] == "" ? 1 : target[0])
   let tspace = len(target[1])
@@ -329,11 +207,13 @@ function! s:dosurround(...)
   endif
   let outer_pos = [getpos("'["), getpos("']")]
 
-  let sobj = surround#resolve(surround#get(rseq))
-  if surround#is_null(sobj)
-    call setreg('a', reg_save[0], reg_save[1])
-    call setpos(".", pos_save)
-    return
+  if rseq != []
+    let sobj = surround#resolve(surround#get(rseq))
+    if surround#is_null(sobj)
+      call setreg('a', reg_save[0], reg_save[1])
+      call setpos(".", pos_save)
+      return
+    endif
   endif
 
   call setpos(".", pos_save)
@@ -457,8 +337,8 @@ function! s:dosurround(...)
 
   normal! `[
 
-  let s:lastdel = join(surrounds, '')
-  call setreg('"', s:lastdel)
+  let b:surround_lastdel = join(surrounds, '')
+  call setreg('"', b:surround_lastdel)
 
   call setreg('a', reg_save[0], reg_save[1])
   let &selection = sel_save
@@ -471,11 +351,11 @@ function! s:dosurround(...)
 endfunction
 
 function! s:changesurround()
-  let a = s:inputtarget()
+  let a = surround#inputtarget()
   if a == []
     return ""
   endif
-  let b = s:inputreplacement()
+  let b = surround#inputreplacement()
   if b == []
     return ""
   endif
@@ -485,7 +365,7 @@ endfunction
 function! s:opfunc(type, ...)
   let blockmode = a:0 > 0 ? a:1 : 0
 
-  let rseq = s:inputreplacement()
+  let rseq = surround#inputreplacement()
   if rseq == []
     return ""
   endif
@@ -621,20 +501,20 @@ let s:surround_default_objects = {
 \  'p': {'left': "\n\n", 'right': "\n\n", 'nspaces': 0},
 \  's': {'left': ' ', 'right': ' ', 'nspaces': 0},
 \  't': {'left': "<\1>", 'right': "</\2>", 'nspaces': 0,
-\        'inputfunc': function('s:tag_input')},
+\        'inputfunc': 'surround#tag_input'},
 \  'T': {'left': "<\1>", 'right': "</\2>", 'nspaces': 0,
-\        'inputfunc': function('s:tag_input_lastdel')},
+\        'inputfunc': 'surround#tag_input_lastdel'},
 \  ',': {'left': "<\1>\n\t", 'right': "\n</\2>", 'nspaces': 0,
-\        'inputfunc': function('s:tag_input')},
+\        'inputfunc': 'surround#tag_input'},
 \  'l': {'left': "\\begin\1", 'right': "\\end\2", 'nspaces': 0,
-\        'inputfunc': function('s:latex_input')},
+\        'inputfunc': 'surround#latex_input'},
 \  '\': {'left': "\\begin\1", 'right': "\\end\2", 'nspaces': 0,
-\        'inputfunc': function('s:latex_input')},
+\        'inputfunc': 'surround#latex_input'},
 \  'f': {'left': "\1(", 'right': ')', 'nspaces': 0,
-\        'inputfunc': function('s:simple_input'),
+\        'inputfunc': 'surround#simple_input',
 \        'inputfuncargs': ['function: ']},
 \  'F': {'left': "\1(", 'right': ')', 'nspaces': 1,
-\        'inputfunc': function('s:simple_input'),
+\        'inputfunc': 'surround#simple_input',
 \        'inputfuncargs': ['function: ']},
 \}
 
