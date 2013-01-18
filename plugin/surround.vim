@@ -261,9 +261,11 @@ function! s:insert(...)
   let cb_save = &clipboard
   set clipboard-=unnamed
   let reg_save = @@
+  let sobj = surround#resolve(surround#get(rseq))
+  if surround#is_null(sobj)
+    return ""
+  endif
   call setreg('"',"\r",'v')
-  let sobj = surround#get(rseq)
-  let sobj = surround#resolve(sobj)
   call s:wrapreg(sobj,'"',linemode)
   " If line mode is used and the surrounding consists solely of a suffix,
   " remove the initial newline.  This fits a use case of mine but is a
@@ -322,9 +324,17 @@ function! s:dosurround(...)
   if getreg('a') == ''
     " No text-object found.
     call setreg('a', reg_save[0], reg_save[1])
+    call setpos(".", pos_save)
     return
   endif
   let outer_pos = [getpos("'["), getpos("']")]
+
+  let sobj = surround#resolve(surround#get(rseq))
+  if surround#is_null(sobj)
+    call setreg('a', reg_save[0], reg_save[1])
+    call setpos(".", pos_save)
+    return
+  endif
 
   call setpos(".", pos_save)
 
@@ -421,8 +431,6 @@ function! s:dosurround(...)
 
   call setreg('a', inner, 'v')
   if rseq != []
-    let sobj = surround#get(rseq)
-    let sobj = surround#resolve(sobj)
     call s:wrapreg(sobj, 'a')
   endif
   call setreg('a', before . getreg('a') . after, outertype)
@@ -477,6 +485,11 @@ function! s:opfunc(type, ...)
     return ""
   endif
 
+  let sobj = surround#resolve(surround#get(rseq))
+  if surround#is_null(sobj)
+    return ""
+  endif
+
   let reg_save = [getreg('a'), getregtype('a')]
   let sel_save = &selection
   let cb_save  = &clipboard
@@ -518,8 +531,6 @@ function! s:opfunc(type, ...)
   endif
 
   call setreg('a', inner, type)
-  let sobj = surround#get(rseq)
-  let sobj = surround#resolve(sobj)
   call s:wrapreg(sobj, 'a', blockmode, indent)
 
   call setreg('a', before . getreg('a') . after, otype)
