@@ -396,6 +396,56 @@ endfunction
 
 " }}}1
 
+" Insert mode functions {{{1
+
+function! surround#insert(...)
+    let special = a:0 ? a:1 : 0
+
+    let rseq = surround#inputreplacement()
+    while rseq[2] == "\<CR>" || rseq[2] == "\<C-S>"
+	let special = !special
+	let rseq = surround#inputreplacement()
+    endwhile
+
+    if rseq == []
+	return ""
+    endif
+
+    let cb_save = &clipboard
+    set clipboard-=unnamed clipboard-=unnamedplus
+    let reg_save = [getreg('a'), getregtype('a')]
+
+    let sobj = surround#resolve(surround#get(rseq))
+
+    let new = surround#wrap(sobj, "\r", "v", special, '')
+
+    if exists("g:surround_insert_tail")
+	let new .= g:surround_insert_tail
+    endif
+
+    call setreg('a', new, 'v')
+
+    if col('.') >= col('$')
+	normal! "ap
+    else
+	normal! "aP
+    endif
+
+    if special
+	call s:reindent(sobj)
+    endif
+
+    norm! `]
+    call search('\r', 'bW')
+
+    call setreg('a', reg_save[0], reg_save[1])
+    let &clipboard = cb_save
+
+    return "\<Del>"
+endfunction
+
+" }}}1
+
 " Normal and Visual mode functions {{{1
 
 function! surround#dosurround(...)

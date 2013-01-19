@@ -11,65 +11,6 @@ let g:loaded_surround = 1
 let s:cpo_save = &cpo
 set cpo&vim
 
-
-" Insert mode functions {{{1
-
-function! s:insert(...)
-  " Optional argument causes the result to appear on 3 lines, not 1
-  "call inputsave()
-  let linemode = a:0 ? a:1 : 0
-  let rseq = surround#inputreplacement()
-  while rseq[2] == "\<CR>" || rseq[2] == "\<C-S>"
-    " TODO: use total count for additional blank lines
-    let linemode = linemode + 1
-    let rseq = surround#inputreplacement()
-  endwhile
-  "call inputrestore()
-  if rseq == []
-    return ""
-  endif
-  "call inputsave()
-  let cb_save = &clipboard
-  set clipboard-=unnamed
-  let reg_save = @@
-  let sobj = surround#resolve(surround#get(rseq))
-  if surround#is_null(sobj)
-    return ""
-  endif
-  call setreg('"',"\r",'v')
-  call surround#wrapreg(sobj,'"',linemode)
-  " If line mode is used and the surrounding consists solely of a suffix,
-  " remove the initial newline.  This fits a use case of mine but is a
-  " little inconsistent.  Is there anyone that would prefer the simpler
-  " behavior of just inserting the newline?
-  if linemode && match(getreg('"'),'^\n\s*\zs.*') == 0
-    call setreg('"',matchstr(getreg('"'),'^\n\s*\zs.*'),getregtype('"'))
-  endif
-  " This can be used to append a placeholder to the end
-  if exists("g:surround_insert_tail")
-    call setreg('"',g:surround_insert_tail,"a".getregtype('"'))
-  endif
-  "if linemode
-  "call setreg('"',substitute(getreg('"'),'^\s\+','',''),'c')
-  "endif
-  if col('.') >= col('$')
-    norm! ""p
-  else
-    norm! ""P
-  endif
-  if linemode
-    call s:reindent(sobj)
-  endif
-  norm! `]
-  call search('\r','bW')
-  let @@ = reg_save
-  let &clipboard = cb_save
-  return "\<Del>"
-endfunction
-
-" }}}1
-
-
 let s:surround_default_objects = {
 \  'b': {'left': '(', 'right': ')', 'nspaces': 0},
 \  '(': {'left': '(', 'right': ')', 'nspaces': 0},
@@ -127,8 +68,8 @@ vnoremap <silent> <Plug>Vsurround   :<C-u>call surround#opfunc(visualmode())<CR>
 vnoremap <silent> <Plug>VSurround   :<C-u>call surround#opfunc('V')<CR>
 vnoremap <silent> <Plug>Vgsurround  :<C-u>call surround#opfunc_s(visualmode())<CR>
 vnoremap <silent> <Plug>VgSurround  :<C-u>call surround#opfunc_s('V')<CR>
-inoremap <silent> <Plug>Isurround   <C-R>=<SID>insert()<CR>
-inoremap <silent> <Plug>ISurround   <C-R>=<SID>insert(1)<CR>
+inoremap <silent> <Plug>Isurround   <C-R>=surround#insert()<CR>
+inoremap <silent> <Plug>ISurround   <C-R>=surround#insert(1)<CR>
 
 if !exists("g:surround_no_mappings") || ! g:surround_no_mappings
   silent! nmap <unique> ds     <Plug>Dsurround
