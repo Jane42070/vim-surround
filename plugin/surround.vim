@@ -127,44 +127,26 @@ vnoremap <silent> <Plug>Vsurround   :<C-u>call surround#opfunc(visualmode())<CR>
 vnoremap <silent> <Plug>VSurround   :<C-u>call surround#opfunc('V')<CR>
 vnoremap <silent> <Plug>Vgsurround  :<C-u>call surround#opfunc_s(visualmode())<CR>
 vnoremap <silent> <Plug>VgSurround  :<C-u>call surround#opfunc_s('V')<CR>
-vnoremap <silent> <Plug>oVSurround  :<C-u>call surround#opfunc(visualmode(), visualmode() ==# 'V' ? 1 : 0)<CR>
-vnoremap <silent> <Plug>oVgSurround :<C-u>call surround#opfunc(visualmode(), visualmode() ==# 'V' ? 0 : 1)<CR>
 inoremap <silent> <Plug>Isurround   <C-R>=<SID>insert()<CR>
 inoremap <silent> <Plug>ISurround   <C-R>=<SID>insert(1)<CR>
 
 if !exists("g:surround_no_mappings") || ! g:surround_no_mappings
-  if exists("g:surround_old_mappings") && g:surround_old_mappings
-    silent! nmap <unique> ds     <Plug>Dsurround
-    silent! nmap <unique> cs     <Plug>Csurround
-    silent! nmap <unique> ys     <Plug>Ysurround
-    silent! nmap <unique> yS     <Plug>Ygsurround
-    silent! nmap <unique> yss    <Plug>Yssurround
-    silent! nmap <unique> ySs    <Plug>Ygssurround
-    silent! nmap <unique> ySS    <Plug>Ygssurround
-    silent! xmap <unique> s      <Plug>Vsurround
-    silent! xmap <unique> S      <Plug>oVSurround
-    silent! xmap <unique> gS     <Plug>oVgSurround
-    silent! imap <unique> <C-S>  <Plug>Isurround
-    silent! imap <unique> <C-G>s <Plug>Isurround
-    silent! imap <unique> <C-G>S <Plug>ISurround
-  else
-    silent! nmap <unique> ds     <Plug>Dsurround
-    silent! nmap <unique> cs     <Plug>Csurround
-    silent! nmap <unique> ys     <Plug>Ysurround
-    silent! nmap <unique> yS     <Plug>Ysurround$
-    silent! nmap <unique> yss    <Plug>Yssurround
-    silent! nmap <unique> ygs    <Plug>Ygsurround
-    silent! nmap <unique> ygS    <Plug>Ygsurround$
-    silent! nmap <unique> ygss   <Plug>Ygssurround
-    silent! nmap <unique> ygsgs  <Plug>Ygssurround
-    silent! xmap <unique> s      <Plug>Vsurround
-    silent! xmap <unique> S      <Plug>VSurround
-    silent! xmap <unique> gs     <Plug>Vgsurround
-    silent! xmap <unique> gS     <Plug>VgSurround
-    silent! imap <unique> <C-S>  <Plug>Isurround
-    silent! imap <unique> <C-G>s <Plug>Isurround
-    silent! imap <unique> <C-G>S <Plug>ISurround
-  endif
+  silent! nmap <unique> ds     <Plug>Dsurround
+  silent! nmap <unique> cs     <Plug>Csurround
+  silent! nmap <unique> ys     <Plug>Ysurround
+  silent! nmap <unique> yS     <Plug>Ysurround$
+  silent! nmap <unique> yss    <Plug>Yssurround
+  silent! nmap <unique> ygs    <Plug>Ygsurround
+  silent! nmap <unique> ygS    <Plug>Ygsurround$
+  silent! nmap <unique> ygss   <Plug>Ygssurround
+  silent! nmap <unique> ygsgs  <Plug>Ygssurround
+  silent! xmap <unique> s      <Plug>Vsurround
+  silent! xmap <unique> S      <Plug>VSurround
+  silent! xmap <unique> gs     <Plug>Vgsurround
+  silent! xmap <unique> gS     <Plug>VgSurround
+  silent! imap <unique> <C-S>  <Plug>Isurround
+  silent! imap <unique> <C-G>s <Plug>Isurround
+  silent! imap <unique> <C-G>S <Plug>ISurround
 endif
 
 let &cpo = s:cpo_save
