@@ -1,5 +1,8 @@
 " surround.vim - Surroundings
 
+let s:cpo_save = &cpo
+set cpo&vim
+
 " Surround object {{{1
 
 let s:null = {'left': '', 'right': '', 'nspaces': 0, 'reindent': 0}
@@ -716,3 +719,5 @@ function! s:reindent(sobj)
 endfunction
 
 " }}}1
+
+let &cpo = s:cpo_save
