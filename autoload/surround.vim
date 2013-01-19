@@ -393,3 +393,326 @@ endfunction
 
 " }}}1
 
+" Normal and Visual mode functions {{{1
+
+function! surround#dosurround(...)
+    let tseq = a:0 > 0 ? a:1 : surround#inputtarget()
+    let rseq = a:0 > 1 ? a:2 : []
+
+    if tseq == []
+	return
+    endif
+
+    let tcount = v:count1 * (tseq[0] == "" ? 1 : tseq[0])
+    let tspace = len(tseq[1])
+    let target = tseq[2]
+
+    if target == ''
+	return
+    endif
+
+    let pos_save = getpos(".")
+    let reg_save = [getreg('a'), getregtype('a')]
+
+    call setreg('a', '')
+    " Don't use normal! for user-defined objects.
+    execute 'silent normal "ay' . tcount . 'a' . target
+    if getreg('a') == ''
+	" No text object found.
+	call setreg('a', reg_save[0], reg_save[1])
+	call setpos(".", pos_save)
+	return
+    endif
+    let whole_pos = [getpos("'["), getpos("']")]
+
+    call setpos(".", pos_save)
+
+    call setreg('a', '')
+    " Don't use normal! for user-defined objects.
+    execute 'silent normal "ay' . tcount . 'i' . target
+    if getreg('a') == ''
+	" No inner object found.
+	call setreg('a', reg_save[0], reg_save[1])
+	call setpos(".", pos_save)
+	return
+    endif
+    let inner = getreg('a')
+    let innertype = getregtype('a')
+
+    if rseq != []
+	let sobj = surround#resolve(surround#get(rseq))
+	if surround#is_null(sobj)
+	    call setreg('a', reg_save[0], reg_save[1])
+	    call setpos(".", pos_save)
+	    return
+	endif
+    endif
+
+    let sel_save = &selection
+    let &selection = "inclusive"
+
+    call setpos(".", pos_save)
+    let before = ''
+    let after = ''
+
+    if target =~# '^[Wpsw]$'
+	" For non-block objects, determine inner object from a whole object.
+	" Deference in a while object and inner object of these does not
+	" represent surrounding.
+	"
+	" example)
+	" thi*s is example  ; * is cursor, here
+	"   2daw -> example (deleted "this is ")
+	"   2diw -> is example (deleted "this ")
+	" Here, we prefer to wrap 2 words with 2csw command.
+	execute 'silent normal "ad' . tcount . 'a' . target
+
+	let whole = getreg('a')
+	let wholetype = getregtype('a')
+
+	let mlist = matchlist(whole, '^\v(\_s*)(.{-})(\_s*)$')
+	let before = mlist[1]
+	let inner = mlist[2]
+	let after = mlist[3]
+	let surrounds = ['', '']
+    else
+	" For block objects, we assume that difference in a whole object and
+	" inner object is surrounding object.
+	if tspace && innertype ==# 'V'
+	    call setpos('.', whole_pos[0])
+	    call search('\%(^\|\S\)\zs\s*\%#')
+	    normal! m[
+	    call setpos('.', whole_pos[1])
+	    call search('\%#.\s*\ze\%($\|\S\)', 'e')
+	    let delete_space = (col('.') + 1 == col('$'))
+	    normal! v`["ad
+	else
+	    " Don't use normal! for user-defined objects
+	    execute 'silent normal "ad' . tcount . 'a' . target
+	endif
+
+	let whole = getreg('a')
+	let wholetype = getregtype('a')
+
+	let idx = (inner == '') ? 1 : stridx(whole, inner)
+	let len = strlen(inner)
+	let surrounds = [strpart(whole, 0, idx), strpart(whole, idx + len)]
+
+	if tspace
+	    if innertype ==# 'V'
+		let mlist = matchlist(surrounds[0], '^\v(.{-})(\_s*)$')
+		let surrounds[0] = mlist[1]
+		let inner = mlist[2] . inner
+
+		let mlist = matchlist(surrounds[1], '^\v(\_s*)(.{-})$')
+		if delete_space
+		    let surrounds[1] = mlist[1] . mlist[2]
+		else
+		    let inner = inner . mlist[1]
+		    let surrounds[1] = mlist[2]
+		endif
+	    else " innertype ==# 'v'
+		let mlist = matchlist(inner, '^\v(\s*)(.{-})(\s*)$')
+		let inner = mlist[2]
+		let surrounds[0] = surrounds[0] . mlist[1]
+		let surrounds[1] = mlist[3] . surrounds[1]
+	    endif
+	    if surrounds[1][0] == "\n"
+		let surrounds[1] = surrounds[1][1:]
+		let after = "\n"
+	    endif
+	    if surrounds[1][-1] == "\n"
+		let surrounds[1] = surrounds[1][:-2]
+		let after = "\n"
+	    endif
+	else
+	    let mlist = matchlist(surrounds[0], '^\v(\_s*)(.{-})(\_s*)$')
+	    let before = mlist[1]
+	    let surrounds[0] = mlist[2]
+	    let inner = mlist[3] . inner
+
+	    let mlist = matchlist(surrounds[1], '^\v(\_s*)(.{-})(\_s*)$')
+	    let inner = inner . mlist[1]
+	    let surrounds[1] = mlist[2]
+	    let after = mlist[3]
+	endif
+    endif
+
+    if rseq != []
+	let new = surround#wrap(sobj, inner, 'v', 0, '')
+    else
+	let new = inner
+    endif
+    call setreg('a', before . new . after, wholetype)
+
+    undojoin
+    execute 'silent normal! "a' . s:getpcmd(wholetype)
+
+    let ww_save = &whichwrap
+    let &whichwrap = "<,>"
+
+    if before != ''
+	normal! `[
+	execute 'normal! ' . strlen(before) . "\<Right>"
+	normal! m[
+    endif
+
+    if after != ''
+	normal! `]
+	execute 'normal! ' . strlen(after) . "\<Left>"
+	normal! m]
+    endif
+
+    let &whichwrap = ww_save
+
+    normal! `[
+
+    let b:surround_lastdel = join(surrounds, '')
+    call setreg('"', b:surround_lastdel)
+
+    let &selection = sel_save
+    call setreg('a', reg_save[0], reg_save[1])
+
+    if rseq == []
+	silent! call repeat#set("\<Plug>Dsurround" . join(tseq, ''), tcount)
+    else
+	silent! call repeat#set("\<Plug>Csurround" . join(tseq, '') .
+	\                       join(rseq, ''), tcount)
+    endif
+endfunction
+
+function! surround#changesurround()
+    let tseq = surround#inputtarget()
+    if tseq == []
+	return ""
+    endif
+    let rseq = surround#inputreplacement()
+    if rseq == []
+	return ""
+    endif
+    call surround#dosurround(tseq, rseq)
+endfunction
+
+let s:type_map = {"char": "v", "line": "V", "block": "\<C-v>"}
+
+function! surround#opfunc(type, ...)
+    let special = a:0 > 0 ? a:1 : 0
+
+    let rseq = surround#inputreplacement()
+    if rseq == []
+	return
+    endif
+
+    let sobj = surround#resolve(surround#get(rseq))
+    if surround#is_null(sobj)
+	return
+    endif
+
+    let reg_save = [getreg('a'), getregtype('a')]
+    let sel_save = &selection
+    let cb_save  = &clipboard
+
+    let &selection = "inclusive"
+    set clipboard-=unnamed clipboard-=unnamedplus
+
+    if has_key(s:type_map, a:type)
+	let indent = matchstr(getline("'["), '^\s*')
+	execute 'silent normal! `[' . s:type_map[a:type] . '`]"ad'
+    elseif index(["v", "V", "\<C-v>"], a:type) >= 0
+	let indent = matchstr(getline("'<"), '^\s*')
+	let ve_save = &virtualedit
+	if !special
+	    let &virtualedit = ''
+	endif
+	execute 'silent normal! `<' . a:type . '`>"ad'
+	let &virtualedit = ve_save
+    elseif a:type =~ '^\d\+$'
+	let indent = matchstr(getline("."), '^\s*')
+	execute 'silent normal! "a' . a:type . 'dd'
+    else
+	let &selection = sel_save
+	let &clipboard = cb_save
+	return
+    endif
+
+    let type = getregtype('a')
+    let otype = type
+    let inner = getreg('a')
+    let before = ''
+    let after = ''
+
+    if type ==# 'v' || (type ==# 'V' && !special)
+	let type = 'v'
+	let mlist = matchlist(inner, '^\(\s*\)\(.\{-\}\)\(\n\?\s*\)$')
+	let inner = mlist[2]
+	let before = mlist[1]
+	let after = mlist[3]
+    endif
+
+    let new = surround#wrap(sobj, inner, type, special, indent)
+
+    call setreg('a', before . new . after, otype)
+    silent execute 'normal! "a' . s:getpcmd(otype) . '`['
+
+    if special
+	if type ==# 'V' && sobj['nspaces'] > 0
+	    let [spos, epos] = [getpos("'["), getpos("']")]
+
+	    if sobj['nspaces'] > 1
+		call setpos('.', epos)
+		let trim = getline(line('.') + 1) =~# '^\s*$'
+		normal! J
+		if trim && getline('.')[col('.')-1] =~ '\s'
+		    normal! x
+		endif
+		let epos = getpos(".")
+	    endif
+
+	    call setpos('.', spos)
+	    normal! kJm[
+
+	    let epos[1] -= 1
+	    call setpos("']", epos)
+	endif
+
+	call s:reindent(sobj)
+    endif
+
+    let &clipboard = cb_save
+    let &selection = sel_save
+    call setreg('a', reg_save[0], reg_save[1])
+
+    if a:type =~ '^\d\+$'
+	silent! call repeat#set(
+	\   "\<Plug>Y" . (special ? "gs" : "s") . "surround" . join(rseq, ''),
+	\   a:type)
+    else
+	silent! call repeat#set("\<Plug>SurroundRepeat" . join(rseq, ''))
+    endif
+endfunction
+
+function! surround#opfunc_s(arg)
+    call surround#opfunc(a:arg, 1)
+endfunction
+
+function! s:getpcmd(type)
+    if a:type ==# 'V'
+	if line("']") == line("$") + 1 && line(".") == line("$")
+	    return 'p'
+	endif
+    else
+	if col("']") == col("$")
+	    return 'p'
+	endif
+    endif
+    return 'P'
+endfunction
+
+function! s:reindent(sobj)
+    if has_key(a:sobj, 'reindent') ? a:sobj['reindent'] :
+    \  (exists("b:surround_indent") ? b:surround_indent : g:surround_indent)
+	silent normal! '[=']
+    endif
+endfunction
+
+" }}}1
