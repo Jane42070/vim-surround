@@ -12,109 +12,6 @@ let s:cpo_save = &cpo
 set cpo&vim
 
 
-" Wrapping functions {{{1
-
-function! s:wrap(sobj, inner, type, special, indent)
-  let left = a:sobj['left']
-  let right = a:sobj['right']
-  let spaces = repeat(' ', a:sobj['nspaces'])
-
-  if a:type =~ "^\<C-V>"
-    let width = matchstr(a:type, '\d\+$')
-    let lines = split(a:inner, "\n")
-    for i in range(len(lines))
-      let diff = width - len(lines[i])
-      if diff > 0
-        let lines[i] .= repeat(' ', diff)
-      endif
-      let lines[i] = left . spaces . lines[i] . spaces . right
-    endfor
-    return join(lines, "\n")
-  endif
-
-  let left  = substitute(left, '\n\ze\_S', '\n' . a:indent, 'g')
-  let right = substitute(right,'\n\ze\_S', '\n' . a:indent, 'g')
-
-  let left  = substitute(left, '^\n\s\+', '\n', '')
-  let right = substitute(right,'^\n\s\+', '\n', '')
-
-  if !a:special
-    let left  = left . spaces
-    let right = spaces . right
-  else
-    "
-    " Fixup the beginning of the 'left'
-    "
-    if left =~ '^\n'
-      if a:type ==# 'V'
-        " In line-wise mode, ignore the newline at the beginning of 'left'
-        " because it already exists.  This also means "don't indent 'left'."
-        let left = strpart(left, 1)
-      endif
-    else
-      if a:type ==# 'V'
-        " In line-wise mode, indent 'left' at the same level of first line.
-        let left = a:indent . left
-      endif
-    endif
-
-    "
-    " Fixup the end of the 'left'
-    "
-    if left !~ '\n$'
-      " In special mode, a newlines is required before the content.
-      let left = substitute(left,' \+$','','') . "\n"
-    endif
-    if a:type ==# 'v'
-      " In char-wise mode, indent the content.
-      let left = left . a:indent
-    endif
-
-    "
-    " Fixup the beginning of the 'right'
-    "
-    if right =~ '^\n'
-      if a:type ==# 'V'
-        " In line-wise mode, ignore the newline at the beginning of the
-        " 'right'.  because it already exists.  This also means "don't indent
-        " 'right'."
-        let right = strpart(right, 1)
-      endif
-    else
-      " In special mode, indent the 'right' at the same level of first line.
-      let right  = a:indent . substitute(right ,'^ \+','','')
-      if a:type ==# 'v'
-        " In char-wise mode, a newline is required after the content.
-        let right = "\n" . right
-      endif
-    endif
-
-    "
-    " Fixup the end of the 'right'
-    "
-    if right !~ '\n$'
-      if a:type ==# 'V'
-        " In line-wise mode, add the newline at the end of 'right'.
-        let right = right . "\n"
-      endif
-    endif
-  endif
-
-  return left . a:inner . right
-endfunction
-
-function! s:wrapreg(sobj, reg, ...)
-  let orig = getreg(a:reg)
-  "let type = substitute(getregtype(a:reg), '\d\+$', '', '')
-  let type = getregtype(a:reg)
-  let special = a:0 > 0 ? a:1 : 0
-  let indent = a:0 > 1 ? a:2 : ''
-  let new = s:wrap(a:sobj, orig, type, special, indent)
-  call setreg(a:reg, new, type)
-endfunction
-
-" }}}1
-
 " Insert mode functions {{{1
 
 function! s:insert(...)
@@ -140,7 +37,7 @@ function! s:insert(...)
     return ""
   endif
   call setreg('"',"\r",'v')
-  call s:wrapreg(sobj,'"',linemode)
+  call surround#wrapreg(sobj,'"',linemode)
   " If line mode is used and the surrounding consists solely of a suffix,
   " remove the initial newline.  This fits a use case of mine but is a
   " little inconsistent.  Is there anyone that would prefer the simpler
@@ -309,11 +206,12 @@ function! s:dosurround(...)
 
   let pcmd = s:getpcmd(outertype)
 
-  call setreg('a', inner, 'v')
   if rseq != []
-    call s:wrapreg(sobj, 'a')
+    let new = surround#wrap(sobj, inner, 'v', 0, '')
+  else
+    let new = inner
   endif
-  call setreg('a', before . getreg('a') . after, outertype)
+  call setreg('a', before . new . after, outertype)
 
   undojoin
   execute 'silent normal! "a' . pcmd
@@ -395,7 +293,12 @@ function! s:opfunc(type, ...)
     execute 'silent normal! "a' . a:type . 'dd'
   elseif a:type ==# "v" || a:type ==# "V" || a:type ==# "\<C-V>"
     let indent = matchstr(getline("'<"), '^\s*')
+    let ve_save = &virtualedit
+    if !blockmode
+      let &virtualedit = ''
+    endif
     execute 'silent normal! `<' . a:type . '`>"ad'
+    let &virtualedit = ve_save
   else
     let &selection = sel_save
     let &clipboard = cb_save
@@ -416,10 +319,9 @@ function! s:opfunc(type, ...)
     let after = mlist[3]
   endif
 
-  call setreg('a', inner, type)
-  call s:wrapreg(sobj, 'a', blockmode, indent)
+  let new = surround#wrap(sobj, inner, type, blockmode, indent)
 
-  call setreg('a', before . getreg('a') . after, otype)
+  call setreg('a', before . new . after, otype)
   let pcmd = s:getpcmd(otype)
   silent execute 'normal! "a' . pcmd . '`['
 

@@ -298,3 +298,98 @@ function! surround#latex_input()
 endfunction
 
 " }}}1
+
+" Wrapping functions {{{1
+
+function! surround#wrap(sobj, inner, type, special, indent)
+    let left = a:sobj['left']
+    let right = a:sobj['right']
+    let spaces = repeat(' ', a:sobj['nspaces'])
+
+    if a:type =~ "^\<C-V>"
+        let lines = split(a:inner, "\n")
+        call map(lines, "left . spaces . v:val . spaces . right")
+        return join(lines, "\n")
+    endif
+
+    let left  = substitute(left, '\n\ze\_S', '\n' . a:indent, 'g')
+    let right = substitute(right,'\n\ze\_S', '\n' . a:indent, 'g')
+
+    let left  = substitute(left, '^\n\s\+', '\n', '')
+    let right = substitute(right,'^\n\s\+', '\n', '')
+
+    if !a:special
+        let left  = left . spaces
+        let right = spaces . right
+    else
+        "
+        " Fixup the beginning of the 'left'
+        "
+        if left =~ '^\n'
+            if a:type ==# 'V'
+                " Ignore the newline at the beginning of 'left' because it
+                " already exists.  This also means "don't indent 'left'."
+                let left = strpart(left, 1)
+            endif
+        else
+            if a:type ==# 'V'
+                " Indent 'left' with the same level of first line.
+                let left = a:indent . left
+            endif
+        endif
+
+        "
+        " Fixup the end of the 'left'
+        "
+        if left !~ '\n$'
+            " A newlines is required before the content in special mode.
+            let left = substitute(left,' \+$','','') . "\n"
+        endif
+        if a:type ==# 'v'
+            " Indent the content.
+            let left = left . a:indent
+        endif
+
+        "
+        " Fixup the beginning of the 'right'
+        "
+        if right =~ '^\n'
+            if a:type ==# 'V'
+                " Ignore the newline at the beginning of the 'right'.  because
+                " it already exists.  This also means "don't indent 'right'."
+                let right = strpart(right, 1)
+            endif
+        else
+            " Indent the 'right' at the same level of first line.
+            let right  = a:indent . substitute(right ,'^ \+','','')
+            if a:type ==# 'v'
+                " A newline is required after the content in charwise mode.
+                let right = "\n" . right
+            endif
+        endif
+
+        "
+        " Fixup the end of the 'right'
+        "
+        if right !~ '\n$'
+            if a:type ==# 'V'
+                " Add a newline at the end of the 'right'.
+                let right = right . "\n"
+            endif
+        endif
+    endif
+
+    return left . a:inner . right
+endfunction
+
+function! surround#wrapreg(sobj, reg, ...)
+    let orig = getreg(a:reg)
+    let type = getregtype(a:reg)
+    let special = a:0 > 0 ? a:1 : 0
+    let indent = a:0 > 1 ? a:2 : ''
+    let new = surround#wrap(a:sobj, orig, type, special, indent)
+    call setreg(a:reg, new, type)
+endfunction
+
+" }}}1
+
