@@ -531,7 +531,13 @@ function! surround#dosurround(...)
     else
         " For block objects, we assume that difference in a whole object and
         " inner object is surrounding object.
-        if tspace && innertype ==# 'V'
+
+        " Don't use normal! for user-defined objects
+        execute 'silent normal "ad' . tcount . 'a' . target
+
+        if tspace && innertype ==# 'V' && getregtype('a') ==# 'v'
+            " Delete white spaces before and after the surrounding.
+            undo
             call setpos('.', whole_pos[0])
             call search('\%(^\|\S\)\zs\s*\%#')
             normal! m[
@@ -539,9 +545,6 @@ function! surround#dosurround(...)
             call search('\%#.\s*\ze\%($\|\S\)', 'e')
             let delete_space = (col('.') + 1 == col('$'))
             normal! v`["ad
-        else
-            " Don't use normal! for user-defined objects
-            execute 'silent normal "ad' . tcount . 'a' . target
         endif
 
         let whole = getreg('a')
@@ -553,16 +556,18 @@ function! surround#dosurround(...)
 
         if tspace
             if innertype ==# 'V'
-                let mlist = matchlist(surrounds[0], '^\v(.{-})(\_s*)$')
-                let surrounds[0] = mlist[1]
-                let inner = mlist[2] . inner
+                if wholetype ==# 'v'
+                    let mlist = matchlist(surrounds[0], '^\v(.{-})(\_s*)$')
+                    let surrounds[0] = mlist[1]
+                    let inner = mlist[2] . inner
 
-                let mlist = matchlist(surrounds[1], '^\v(\_s*)(.{-})$')
-                if delete_space
-                    let surrounds[1] = mlist[1] . mlist[2]
-                else
-                    let inner = inner . mlist[1]
-                    let surrounds[1] = mlist[2]
+                    let mlist = matchlist(surrounds[1], '^\v(\_s*)(.{-})$')
+                    if delete_space
+                        let surrounds[1] = mlist[1] . mlist[2]
+                    else
+                        let inner = inner . mlist[1]
+                        let surrounds[1] = mlist[2]
+                    endif
                 endif
             else " innertype ==# 'v'
                 let mlist = matchlist(inner, '^\v(\s*)(.{-})(\s*)$')
